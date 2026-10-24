@@ -1,0 +1,1430 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#050A14">
+<meta name="description" content="Vols de concentració: reserva un vol, concentra't i aterra.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}</style>
+<title>Altitud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<style>
+/* Concepte: torre de control nocturna. Globus real a pantalla completa, panells de vidre fumat a sobre; l'ambre dels instruments de cabina marca l'avió i la ruta. Tema fosc únic, triat a propòsit. */
+:root {
+  color-scheme: dark;
+  --nit: #050A14;
+  --mar: #0A1830;
+  --terra: #16263D;
+  --terra-viva: #24405F;
+  --frontera: rgba(140, 175, 220, .22);
+  --grat: rgba(140, 175, 220, .07);
+  --vidre: rgba(9, 17, 31, .78);
+  --vidre-fort: rgba(12, 22, 40, .94);
+  --vora: rgba(150, 185, 230, .14);
+  --vora-forta: rgba(150, 185, 230, .28);
+  --text: #E9EFF8;
+  --suau: #8D9DB6;
+  --apagat: #56657D;
+  --ambre: #FFB547;
+  --ambre-fosc: #2A1D05;
+  --cel: #74C8FF;
+  --ok: #4FD49A;
+  --alerta: #FF9F5A;
+  --perill: #FF6278;
+  --business: #E7C873;
+  --preferent: #74C8FF;
+  --f-display: "Unbounded", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Manrope", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  --r: 16px;
+  --panell-w: 404px;
+}
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body { background: var(--nit); color: var(--text); font-family: var(--f-body); font-size: 14.5px; line-height: 1.5; margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--ambre); outline-offset: 2px; }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.eyebrow { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--suau); }
+h2, h3 { font-family: var(--f-display); font-weight: 700; margin: 0; letter-spacing: -.01em; text-wrap: balance; line-height: 1.1; }
+h2 { font-size: 22px; } h3 { font-size: 15px; }
+.vidre { background: var(--vidre); border: 1px solid var(--vora); border-radius: var(--r); backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }
+
+/* Escena del globus */
+.escena { position: fixed; inset: 0; overflow: hidden; }
+#globus { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#globus:active { cursor: grabbing; }
+
+.dalt {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3; pointer-events: none;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  padding-block: 14px 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.dalt > * { pointer-events: auto; }
+.marca { font-family: var(--f-display); font-weight: 700; font-size: 20px; letter-spacing: .02em; display: flex; align-items: center; gap: 10px; margin-right: auto; }
+.marca svg { width: 26px; height: 26px; color: var(--ambre); }
+.posicio { font-size: 13px; color: var(--suau); padding: 7px 12px; border-radius: 999px; }
+.posicio b { font-family: var(--f-mono); color: var(--text); font-weight: 500; margin-inline: 4px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.segment { display: inline-flex; padding: 3px; border-radius: 999px; gap: 2px; }
+.segment button, .boto-pill { border: 0; background: transparent; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--suau); }
+.segment button[aria-pressed="true"] { background: var(--text); color: var(--nit); }
+.boto-pill { border: 1px solid var(--vora); background: var(--vidre); color: var(--text); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+.boto-pill[aria-pressed="true"] { border-color: var(--ambre); color: var(--ambre); }
+.boto-pill:disabled { opacity: .4; cursor: not-allowed; }
+.zoom { position: absolute; z-index: 3; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 16px; display: grid; gap: 2px; padding: 4px; border-radius: 14px; }
+.zoom button { width: 38px; height: 38px; border: 0; background: transparent; border-radius: 10px; font-size: 20px; font-weight: 600; line-height: 1; }
+.zoom button:hover { background: rgba(255, 255, 255, .08); }
+.zoom span { font-family: var(--f-mono); font-size: 10px; color: var(--suau); text-align: center; padding-block: 2px; }
+.escena.volant .zoom { bottom: 150px; }
+.so { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 12px; border-radius: 999px; }
+.so select { background: transparent; border: 0; padding: 4px 6px; font-size: 13px; font-weight: 600; }
+.so select option { background: var(--vidre-fort); }
+.xip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px 7px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+.xip i { width: 8px; height: 8px; border-radius: 50%; background: var(--apagat); flex: none; }
+.xip[data-s="ok"] i { background: var(--ok); box-shadow: 0 0 0 3px rgba(79, 212, 154, .2); }
+.xip[data-s="fora"] i { background: var(--perill); animation: batec 1s infinite; }
+@keyframes batec { 50% { opacity: .25; } }
+
+/* Panell lateral */
+.panell-wrap { position: fixed; z-index: 4; left: max(16px, env(safe-area-inset-left, 0px)); top: 70px; bottom: 16px; width: var(--panell-w); display: flex; }
+.panell { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.pestanyes { display: flex; gap: 4px; padding: 6px; border-bottom: 1px solid var(--vora); }
+.pestanyes button { flex: 1; border: 0; background: transparent; border-radius: 10px; padding: 8px 6px; font-weight: 600; font-size: 13.5px; color: var(--suau); }
+.pestanyes button[aria-selected="true"] { background: rgba(255, 255, 255, .07); color: var(--text); }
+.pestanya { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 18px; min-height: 0; }
+.pestanya::-webkit-scrollbar { width: 8px; } .pestanya::-webkit-scrollbar-thumb { background: var(--vora); border-radius: 4px; }
+.bloc { display: flex; flex-direction: column; gap: 10px; }
+.bloc-cap { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 8px; }
+
+.xips { display: flex; flex-wrap: wrap; gap: 6px; }
+.xips button { border: 1px solid var(--vora); background: transparent; border-radius: 10px; padding: 6px 11px; font-size: 13.5px; font-weight: 600; color: var(--suau); }
+.xips button:hover { border-color: var(--vora-forta); color: var(--text); }
+.xips button[aria-pressed="true"] { background: var(--ambre); border-color: var(--ambre); color: var(--ambre-fosc); }
+.xips.mono button { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-weight: 500; }
+.durada-gran { font-family: var(--f-display); font-weight: 700; font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; }
+.durada-gran small { font-family: var(--f-mono); font-size: 12px; font-weight: 400; color: var(--suau); margin-left: 4px; }
+input[type=range] { width: 100%; accent-color: var(--ambre); }
+
+.destins { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.desti { text-align: left; border: 1px solid var(--vora); background: rgba(255, 255, 255, .02); border-radius: 12px; padding: 9px 10px; display: grid; gap: 1px; min-width: 0; }
+.desti:hover { border-color: var(--vora-forta); }
+.desti b { font-family: var(--f-display); font-weight: 700; font-size: 19px; letter-spacing: .02em; line-height: 1.15; }
+.desti span { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.desti em { font-style: normal; font-family: var(--f-mono); font-size: 10.5px; color: var(--suau); }
+.desti[aria-pressed="true"] { border-color: var(--ambre); background: rgba(255, 181, 71, .1); }
+.desti[aria-pressed="true"] b { color: var(--ambre); }
+
+.seient-fila { display: flex; align-items: center; gap: 12px; border: 1px solid var(--vora); border-radius: 12px; padding: 10px 12px; }
+.seient-codi { font-family: var(--f-display); font-weight: 700; font-size: 26px; line-height: 1; min-width: 56px; }
+.seient-info { flex: 1; display: grid; font-size: 13px; min-width: 0; }
+.seient-info span:last-child { color: var(--suau); }
+.classe-tag { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; }
+.classe-tag[data-c="Business"] { color: var(--business); } .classe-tag[data-c="Preferent"] { color: var(--preferent); } .classe-tag[data-c="Turista"] { color: var(--suau); }
+
+input[type=text] { width: 100%; box-sizing: border-box; background: rgba(255, 255, 255, .04); border: 1px solid var(--vora); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+input[type=text]::placeholder { color: var(--apagat); }
+
+.primari { border: 0; background: var(--ambre); color: var(--ambre-fosc); border-radius: 12px; padding: 13px 16px; font-family: var(--f-display); font-weight: 700; font-size: 14px; letter-spacing: .04em; }
+.primari:hover { filter: brightness(1.07); }
+.primari:disabled { opacity: .45; cursor: not-allowed; }
+.secundari { border: 1px solid var(--vora-forta); background: transparent; border-radius: 12px; padding: 10px 14px; font-weight: 600; font-size: 13.5px; }
+.secundari:hover { border-color: var(--text); }
+.perill { color: var(--perill); border-color: rgba(255, 98, 120, .35); }
+.fila-botons { display: flex; flex-wrap: wrap; gap: 8px; }
+.fila-botons > * { flex: 1 1 auto; }
+details.ajuda { border-top: 1px solid var(--vora); padding-top: 14px; font-size: 13px; color: var(--suau); }
+details.ajuda summary { cursor: pointer; font-weight: 600; color: var(--text); }
+details.ajuda ol { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+details.ajuda b { color: var(--text); }
+
+/* Targeta d'embarcament */
+.targeta { border-radius: 14px; overflow: hidden; background: linear-gradient(160deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .02)); border: 1px solid var(--vora); }
+.targeta-cap { display: flex; justify-content: space-between; padding: 10px 16px; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .14em; background: rgba(255, 255, 255, .05); }
+.targeta[data-c="Business"] .targeta-cap { background: var(--business); color: #2B220A; }
+.targeta[data-c="Preferent"] .targeta-cap { background: var(--preferent); color: #062033; }
+.ruta { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 8px; padding: 16px 16px 6px; }
+.ruta .codi { font-family: var(--f-display); font-weight: 700; font-size: 40px; line-height: .95; letter-spacing: .01em; }
+.ruta .dreta { text-align: right; } .ruta .dreta .codi { color: var(--ambre); }
+.ruta .ciutat { font-size: 12.5px; color: var(--suau); }
+.ruta svg { width: 50px; height: 22px; margin-bottom: 18px; color: var(--suau); }
+.camps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 10px 16px 14px; }
+.camps div { display: grid; gap: 1px; min-width: 0; }
+.camps b { font-family: var(--f-mono); font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.perfora { border-top: 1.5px dashed var(--vora-forta); margin-inline: 10px; }
+.matriu { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; }
+.codi-barres { height: 26px; flex: 1; max-width: 170px; opacity: .75; background: repeating-linear-gradient(90deg, var(--text) 0 2px, transparent 2px 4px, var(--text) 4px 5px, transparent 5px 8px, var(--text) 8px 11px, transparent 11px 12px); }
+.objectiu-linia { padding: 0 16px 12px; font-size: 13px; color: var(--suau); }
+.objectiu-linia b { color: var(--text); font-weight: 600; }
+
+.avis { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: rgba(255, 181, 71, .1); font-size: 13.5px; }
+.avis b { display: block; }
+.avis .punt { width: 9px; height: 9px; border-radius: 50%; background: var(--ambre); margin-top: 6px; flex: none; animation: batec 1.2s infinite; }
+.avis[data-s="ok"] { background: rgba(79, 212, 154, .1); } .avis[data-s="ok"] .punt { background: var(--ok); animation: none; }
+.avis[data-s="fora"] { background: rgba(255, 98, 120, .12); } .avis[data-s="fora"] .punt { background: var(--perill); }
+
+/* Vol en curs (panell) */
+.llista-dades { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--vora); border: 1px solid var(--vora); border-radius: 12px; overflow: hidden; }
+.llista-dades div { background: var(--vidre-fort); padding: 10px 12px; display: grid; gap: 1px; min-width: 0; }
+.llista-dades b { font-family: var(--f-mono); font-weight: 500; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.turbs ul { margin: 6px 0 0; padding-left: 18px; font-family: var(--f-mono); font-size: 12px; color: var(--alerta); }
+
+/* HUD inferior */
+.hud { position: absolute; z-index: 3; left: calc(var(--panell-w) + 32px); right: max(16px, env(safe-area-inset-right, 0px)); bottom: 16px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 26px; align-items: center; padding: 16px 22px; }
+.hud-compte { font-family: var(--f-display); font-weight: 700; font-size: 52px; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.hud-mig { display: grid; gap: 10px; min-width: 0; }
+.hud-ruta { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; font-family: var(--f-mono); font-weight: 500; }
+.hud-barra { position: relative; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .1); }
+.hud-barra i { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: linear-gradient(90deg, rgba(255, 181, 71, .3), var(--ambre)); }
+.hud-barra svg { position: absolute; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); color: var(--ambre); filter: drop-shadow(0 0 6px rgba(255, 181, 71, .6)); }
+.hud-dades { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--suau); }
+.hud-dades b { color: var(--text); font-weight: 600; }
+.hud-dades .mono b { font-weight: 500; }
+.hud-dreta { display: grid; gap: 6px; justify-items: end; max-width: 240px; text-align: right; }
+.fase { font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--ambre); color: var(--ambre); }
+.hud-obj { font-size: 13px; color: var(--suau); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+/* Finestreta */
+.finestra { position: absolute; z-index: 3; right: max(16px, env(safe-area-inset-right, 0px)); top: 120px; width: 212px; display: grid; gap: 8px; justify-items: center; }
+.marc { width: 212px; height: 290px; border-radius: 46% / 36%; padding: 12px; box-sizing: border-box; background: linear-gradient(145deg, #2A3343, #151B26); box-shadow: 0 20px 50px -20px rgba(0, 0, 0, .9), inset 0 1px 0 rgba(255, 255, 255, .08); }
+.marc canvas { width: 100%; height: 100%; display: block; border-radius: 44% / 34%; box-shadow: inset 0 0 22px rgba(0, 0, 0, .6); }
+.finestra-peu { font-family: var(--f-mono); font-size: 11px; color: var(--suau); padding: 4px 10px; border-radius: 999px; }
+
+/* Avisos de cabina */
+.toast { position: absolute; z-index: 5; top: 70px; left: calc((100% + var(--panell-w) + 16px) / 2); transform: translateX(-50%); max-width: min(560px, calc(100% - var(--panell-w) - 64px)); display: flex; gap: 12px; align-items: center; padding: 12px 18px; font-size: 14px; animation: entra .4s ease-out; }
+.toast svg { width: 20px; height: 20px; color: var(--ambre); flex: none; }
+@keyframes entra { from { opacity: 0; transform: translate(-50%, -8px); } }
+
+/* Diari */
+.totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; }
+.totals div { display: grid; }
+.totals b { font-family: var(--f-display); font-weight: 700; font-size: 30px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.grafic svg { width: 100%; height: auto; display: block; }
+.grafic .barra { fill: var(--ambre); } .grafic .barra.buida { fill: rgba(255, 255, 255, .08); }
+.grafic text { fill: var(--suau); font-family: var(--f-mono); font-size: 10px; }
+.grafic .valor { fill: var(--text); }
+.motius-barres { display: grid; gap: 8px; }
+.motiu-barra { display: grid; grid-template-columns: 76px 1fr auto; gap: 10px; align-items: center; font-size: 13px; }
+.motiu-barra span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.motiu-barra div { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .07); overflow: hidden; }
+.motiu-barra i { display: block; height: 100%; background: var(--cel); border-radius: 3px; }
+.vols-llista { display: grid; gap: 0; border: 1px solid var(--vora); border-radius: 12px; overflow: hidden; }
+.vol-fila { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--vora); font-size: 13px; }
+.vol-fila:last-child { border-bottom: 0; }
+.vol-fila .data { font-family: var(--f-mono); font-size: 11.5px; color: var(--suau); }
+.vol-fila .rt { font-family: var(--f-mono); font-weight: 500; }
+.vol-fila .sub { color: var(--suau); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.etiq { font-family: var(--f-mono); font-size: 10.5px; padding: 2px 7px; border-radius: 6px; border: 1px solid currentColor; white-space: nowrap; }
+.etiq.net { color: var(--ok); } .etiq.turb { color: var(--alerta); } .etiq.emerg { color: var(--perill); }
+.buit { color: var(--suau); font-size: 13.5px; margin: 0; }
+
+/* Passaport */
+.segells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.segell { aspect-ratio: 1; max-width: 100%; border-radius: 50%; border: 2px solid currentColor; display: grid; place-content: center; text-align: center; position: relative; padding: 6px; }
+.segell::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; border: 1px dashed currentColor; opacity: .6; }
+.segell b { font-family: var(--f-display); font-weight: 700; font-size: 18px; line-height: 1; }
+.segell span { font-size: 10px; line-height: 1.2; }
+.segell em { font-style: normal; font-family: var(--f-mono); font-size: 9px; opacity: .8; }
+.segell.c0 { color: var(--ambre); } .segell.c1 { color: var(--cel); } .segell.c2 { color: var(--ok); } .segell.c3 { color: #F08BD0; }
+.segell.buit { color: var(--apagat); border-style: dashed; }
+.segell.buit::after { display: none; }
+.insignies { display: grid; gap: 8px; }
+.insignia { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--vora); border-radius: 12px; }
+.insignia .ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: rgba(255, 255, 255, .05); color: var(--apagat); }
+.insignia.feta .ic { background: rgba(255, 181, 71, .14); color: var(--ambre); }
+.insignia .ic svg { width: 20px; height: 20px; }
+.insignia b { font-size: 13.5px; } .insignia p { margin: 0; font-size: 12px; color: var(--suau); }
+.insignia .prog { height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .08); margin-top: 6px; overflow: hidden; }
+.insignia .prog i { display: block; height: 100%; background: var(--ambre); }
+
+/* Resum d'aterratge */
+.estampa { display: inline-block; transform: rotate(-4deg); border: 2px solid var(--ok); color: var(--ok); border-radius: 8px; padding: 4px 12px; font-family: var(--f-display); font-weight: 700; font-size: 16px; letter-spacing: .06em; text-transform: uppercase; }
+.estampa[data-s="turb"] { border-color: var(--alerta); color: var(--alerta); }
+.estampa[data-s="emerg"] { border-color: var(--perill); color: var(--perill); }
+.xifres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.xifres div { display: grid; }
+.xifres b { font-family: var(--f-display); font-weight: 700; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.escala-compte { font-family: var(--f-display); font-weight: 700; font-size: 64px; line-height: 1; font-variant-numeric: tabular-nums; }
+
+/* Diàlegs */
+.velo { position: fixed; inset: 0; z-index: 20; background: rgba(2, 5, 12, .62); display: grid; place-items: center; padding: 16px; }
+.dialeg { background: #0C1628; border: 1px solid var(--vora); border-radius: var(--r); padding: 22px; max-width: 400px; width: 100%; box-sizing: border-box; display: grid; gap: 14px; box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .9); min-width: 0; }
+.dialeg p { margin: 0; color: var(--suau); }
+.dialeg.ample { max-width: 960px; }
+.llegenda { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--suau); }
+.llegenda span { display: inline-flex; align-items: center; gap: 6px; }
+.llegenda i { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid; display: inline-block; }
+.fuselatge-wrap { overflow-x: auto; padding-bottom: 8px; min-width: 0; }
+.fuselatge { display: flex; align-items: center; gap: 4px; padding: 18px 26px 18px 70px; width: max-content; border-radius: 120px 40px 40px 120px; background: rgba(255, 255, 255, .03); border: 1px solid var(--vora); }
+.fila { display: grid; grid-template-rows: repeat(3, 26px) 18px repeat(3, 26px); gap: 4px; justify-items: center; }
+.fila.ample-f { grid-template-rows: 40px 26px 18px 26px 40px; }
+.fila .num { font-family: var(--f-mono); font-size: 10px; color: var(--apagat); align-self: center; }
+.fila.sortida .num { color: var(--perill); }
+.st { width: 26px; height: 26px; border-radius: 6px 6px 4px 4px; border: 1.5px solid var(--vora-forta); background: transparent; padding: 0; font-family: var(--f-mono); font-size: 9.5px; color: var(--suau); }
+.fila.ample-f .st { width: 34px; height: 40px; }
+.st[data-c="Business"] { border-color: var(--business); color: var(--business); }
+.st[data-c="Preferent"] { border-color: var(--preferent); color: var(--preferent); }
+.st:hover:not(:disabled) { background: rgba(255, 255, 255, .1); }
+.st.ocupat { background: rgba(255, 255, 255, .06); border-color: transparent; color: transparent; cursor: not-allowed; }
+.st.bloc { opacity: .3; cursor: not-allowed; }
+.st[aria-pressed="true"] { background: var(--ambre); border-color: var(--ambre); color: var(--ambre-fosc); font-weight: 700; }
+.separador { width: 1px; align-self: stretch; background: var(--vora); margin-inline: 8px; }
+
+/* Mode mòbil */
+.mobil { min-height: 100vh; min-height: 100dvh; box-sizing: border-box; display: flex; flex-direction: column; gap: 22px; padding-block: 22px 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 520px; margin-inline: auto; }
+.mobil-cap { display: flex; justify-content: space-between; align-items: center; }
+.mobil-centre { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 18px; text-align: center; }
+.mobil-centre p { margin: 0; color: var(--suau); }
+.mobil .compte { font-family: var(--f-display); font-weight: 700; font-size: clamp(64px, 22vw, 120px); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.mobil .ruta-linia { font-family: var(--f-display); font-weight: 700; font-size: 26px; }
+.mobil .ruta-linia em { font-style: normal; color: var(--ambre); }
+.mobil .barra-m { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .1); position: relative; }
+.mobil .barra-m i { position: absolute; inset: 0 auto 0 0; background: var(--ambre); border-radius: 2px; }
+.mobil.en-vol { --text: #9AA7BA; --suau: #56657D; }
+.icona-gira { width: 60px; height: 60px; margin-inline: auto; color: var(--suau); }
+.canvi-mode { background: none; border: 0; color: var(--suau); text-decoration: underline; font-size: 13px; padding: 4px; }
+
+@media (max-width: 899px) {
+  :root { --panell-w: 0px; }
+  .escena { position: relative; height: 62vh; min-height: 440px; }
+  .panell-wrap { position: static; width: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px 24px; }
+  .pestanya { overflow: visible; }
+  .hud { left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); bottom: 10px; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; padding: 12px 14px; }
+  .hud-compte { font-size: 34px; }
+  .hud-dreta { display: none; }
+  .finestra { top: auto; bottom: 150px; width: 104px; }
+  .escena.volant .zoom { bottom: 140px; }
+  .zoom { right: auto; left: max(10px, env(safe-area-inset-left, 0px)); }
+  .marc { width: 104px; height: 142px; padding: 6px; }
+  .finestra-peu { display: none; }
+  .toast { left: 50%; max-width: calc(100% - 32px); top: 108px; }
+}
+@media (max-width: 460px) {
+  .destins { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .camps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ruta .codi { font-size: 32px; }
+  .posicio { display: none; }
+  .hud-dades span:nth-child(n+3) { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div id="escriptori">
+  <div class="escena" id="escena">
+    <canvas id="globus" aria-label="Globus amb la ruta del vol"></canvas>
+    <header class="dalt">
+      <div class="marca"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 15.5v-2l-8-5V3.2a1.5 1.5 0 0 0-3 0V8.5l-8 5v2l8-2.5v5.3l-2 1.5V21l3.5-1 3.5 1v-1.2l-2-1.5V13z"/></svg>Altitud</div>
+      <div class="posicio vidre">Ets a<b id="pos-codi">BCN</b><span id="pos-nom">Barcelona</span></div>
+      <div class="controls">
+        <div class="segment vidre" role="group" aria-label="Càmera">
+          <button type="button" data-cam="pilot" aria-pressed="false">Pilot</button>
+          <button type="button" data-cam="seguir" aria-pressed="true">Seguir</button>
+          <button type="button" data-cam="ruta" aria-pressed="false">Ruta</button>
+        </div>
+        <button type="button" class="boto-pill" id="b-recentrar" hidden>Recentrar</button>
+        <button type="button" class="boto-pill" id="b-finestra" aria-pressed="true">Finestreta</button>
+        <label class="so vidre"><span class="eyebrow">So</span>
+          <select id="sel-so" aria-label="So ambient"><option value="silenci">Silenci</option><option value="motor">Motor</option><option value="pluja">Pluja</option></select>
+        </label>
+        <span class="xip vidre" id="xip-mobil" data-s="cap"><i></i><span id="xip-text">Mòbil no enllaçat</span></span>
+      </div>
+    </header>
+
+    <div class="hud vidre" id="hud" hidden>
+      <div class="hud-compte" id="h-compte">--:--</div>
+      <div class="hud-mig">
+        <div class="hud-ruta"><span id="h-o">BCN</span>
+          <div class="hud-barra"><i id="h-barra"></i><svg id="h-avio" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path transform="rotate(90 12 12)" d="M21 15.5v-2l-8-5V3.2a1.5 1.5 0 0 0-3 0V8.5l-8 5v2l8-2.5v5.3l-2 1.5V21l3.5-1 3.5 1v-1.2l-2-1.5V13z"/></svg></div>
+          <span id="h-d">NCE</span></div>
+        <div class="hud-dades">
+          <span>Sobrevolant <b id="h-sobre">—</b></span>
+          <span class="mono"><b id="h-alt">0</b> m</span>
+          <span class="mono"><b id="h-vel">0</b> km/h</span>
+          <span class="mono">Arribada <b id="h-eta">--:--</b></span>
+        </div>
+      </div>
+      <div class="hud-dreta"><span class="fase" id="h-fase">Ascens</span><span class="hud-obj" id="h-obj"></span></div>
+    </div>
+
+    <div class="zoom vidre" role="group" aria-label="Zoom del mapa">
+      <button type="button" id="z-mes" aria-label="Apropar">+</button>
+      <span id="z-escala">—</span>
+      <button type="button" id="z-menys" aria-label="Allunyar">−</button>
+    </div>
+
+    <div class="finestra" id="finestra" hidden>
+      <div class="marc"><canvas id="c-finestra"></canvas></div>
+      <span class="finestra-peu vidre" id="finestra-peu">Seient</span>
+    </div>
+
+    <div class="toast vidre" id="toast" role="status" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg>
+      <span id="toast-text"></span>
+    </div>
+  </div>
+
+  <div class="panell-wrap">
+    <aside class="panell vidre">
+      <nav class="pestanyes" role="tablist" aria-label="Seccions">
+        <button type="button" role="tab" data-tab="vol" aria-selected="true">Vol</button>
+        <button type="button" role="tab" data-tab="diari" aria-selected="false">Diari</button>
+        <button type="button" role="tab" data-tab="passaport" aria-selected="false">Passaport</button>
+      </nav>
+      <div class="pestanya" id="tab-vol" role="tabpanel"></div>
+      <div class="pestanya" id="tab-diari" role="tabpanel" hidden></div>
+      <div class="pestanya" id="tab-passaport" role="tabpanel" hidden></div>
+    </aside>
+  </div>
+</div>
+
+<div id="vista-mobil" class="mobil" hidden></div>
+
+<div class="velo" id="velo-seients" hidden>
+  <div class="dialeg ample" role="dialog" aria-modal="true" aria-labelledby="seients-t">
+    <div class="bloc-cap"><h2 id="seients-t">Tria el teu seient</h2><span class="eyebrow" id="seients-info"></span></div>
+    <div class="llegenda">
+      <span><i style="border-color:var(--business)"></i>Business · files 1–3</span>
+      <span><i style="border-color:var(--preferent)"></i>Preferent · files 4–8</span>
+      <span><i style="border-color:var(--vora-forta)"></i>Turista</span>
+      <span><i style="background:rgba(255,255,255,.06);border-color:transparent"></i>Ocupat</span>
+      <span><i style="border-color:var(--perill)"></i>Fila de sortida</span>
+    </div>
+    <div class="fuselatge-wrap"><div class="fuselatge" id="fuselatge"></div></div>
+    <p id="seients-nota"></p>
+    <div class="fila-botons"><button type="button" class="secundari" id="seients-no">Cancel·lar</button><button type="button" class="primari" id="seients-si">Confirmar seient</button></div>
+  </div>
+</div>
+
+<div class="velo" id="velo-emerg" hidden>
+  <div class="dialeg" role="dialog" aria-modal="true" aria-labelledby="dlg-t">
+    <h2 id="dlg-t">Aterratge d'emergència?</h2>
+    <p>El vol s'acaba ara. Es guarden els minuts i quilòmetres fets, però no arribes a la destinació.</p>
+    <div class="fila-botons"><button type="button" class="secundari" id="dlg-no">Continuar volant</button><button type="button" class="primari" id="dlg-si">Aterrar ara</button></div>
+  </div>
+</div>
+
+<script>
+(function () {
+"use strict";
+const $ = (id) => document.getElementById(id);
+const TAU = Math.PI * 2, RAD = Math.PI / 180;
+const KM_PER_MIN = 13;
+const CREUER = 11280;
+
+/* ---------- Dades fixes ---------- */
+const CIUTATS = [
+  ["BCN","Barcelona",41.30,2.08],["MAD","Madrid",40.47,-3.56],["VLC","València",39.49,-0.48],["PMI","Palma",39.55,2.74],
+  ["IBZ","Eivissa",38.87,1.37],["ZAZ","Saragossa",41.67,-1.04],["BIO","Bilbao",43.30,-2.91],["SVQ","Sevilla",37.42,-5.90],
+  ["AGP","Màlaga",36.67,-4.50],["LIS","Lisboa",38.77,-9.13],["OPO","Porto",41.24,-8.68],["TLS","Tolosa",43.63,1.37],
+  ["MRS","Marsella",43.44,5.22],["NCE","Niça",43.66,7.22],["LYS","Lió",45.73,5.08],["CDG","París",49.01,2.55],
+  ["GVA","Ginebra",46.24,6.11],["ZRH","Zuric",47.46,8.55],["MXP","Milà",45.63,8.72],["FCO","Roma",41.80,12.25],
+  ["NAP","Nàpols",40.88,14.29],["VCE","Venècia",45.51,12.35],["ALG","Alger",36.69,3.22],["TUN","Tunis",36.85,10.23],
+  ["RAK","Marràqueix",31.61,-8.04],["CMN","Casablanca",33.37,-7.59],["LHR","Londres",51.47,-0.45],["DUB","Dublín",53.42,-6.27],
+  ["EDI","Edimburg",55.95,-3.37],["AMS","Amsterdam",52.31,4.76],["BRU","Brussel·les",50.90,4.48],["FRA","Frankfurt",50.03,8.57],
+  ["MUC","Munic",48.35,11.79],["VIE","Viena",48.11,16.57],["PRG","Praga",50.10,14.26],["BER","Berlín",52.37,13.50],
+  ["CPH","Copenhaguen",55.62,12.65],["OSL","Oslo",60.19,11.10],["ARN","Estocolm",59.65,17.92],["HEL","Hèlsinki",60.32,24.96],
+  ["WAW","Varsòvia",52.17,20.97],["KRK","Cracòvia",50.08,19.78],["BUD","Budapest",47.44,19.26],["ZAG","Zagreb",45.74,16.07],
+  ["SPU","Split",43.54,16.30],["DBV","Dubrovnik",42.56,18.27],["ATH","Atenes",37.94,23.94],["JTR","Santorini",36.40,25.48],
+  ["IST","Istanbul",41.26,28.74],["OTP","Bucarest",44.57,26.09],["RIX","Riga",56.92,23.97],["MLA","Malta",35.86,14.48],
+  ["KEF","Reykjavík",63.99,-22.62],["TFN","Tenerife",28.48,-16.34],["LPA","Gran Canària",27.93,-15.39],["FNC","Madeira",32.70,-16.77],
+  ["CAI","El Caire",30.12,31.41],["TLV","Tel Aviv",32.01,34.89],["DXB","Dubai",25.25,55.36],["JFK","Nova York",40.64,-73.78]
+];
+const PER_CODI = {};
+CIUTATS.forEach(c => { PER_CODI[c[0]] = { codi: c[0], nom: c[1], lat: c[2], lon: c[3] }; });
+const PER_CODI_NOM = { "Barcelona":1,"Madrid":1,"Valencia":1,"Palma":1,"Zaragoza":1,"Bilbao":1,"Sevilla":1,"Málaga":1,"Lisbon":1,"Porto":1,"Toulouse":1,"Marseille":1,"Nice":1,"Lyon":1,"Paris":1,"Geneva":1,"Zürich":1,"Milan":1,"Rome":1,"Naples":1,"Venice":1,"Algiers":1,"Tunis":1,"Marrakesh":1,"Casablanca":1,"London":1,"Dublin":1,"Edinburgh":1,"Amsterdam":1,"Brussels":1,"Frankfurt am Main":1,"Munich":1,"Vienna":1,"Prague":1,"Berlin":1,"Copenhagen":1,"Oslo":1,"Stockholm":1,"Helsinki":1,"Warsaw":1,"Kraków":1,"Budapest":1,"Zagreb":1,"Split":1,"Dubrovnik":1,"Athens":1,"Istanbul":1,"Bucharest":1,"Riga":1,"Reykjavík":1,"Cairo":1,"Tel Aviv":1,"Dubai":1 };
+const DURADES = [25, 45, 60, 90, 120, 180];
+const MOTIUS = ["Estudi", "Pràctiques", "Lectura", "Projecte", "IDI", "XC", "AC", "EEE", "GCS", "PROP"];
+const PAISOS = {
+  "Spain":"Espanya","France":"França","Italy":"Itàlia","Portugal":"Portugal","Germany":"Alemanya","United Kingdom":"Regne Unit","Ireland":"Irlanda",
+  "Netherlands":"Països Baixos","Belgium":"Bèlgica","Switzerland":"Suïssa","Austria":"Àustria","Czechia":"Txèquia","Poland":"Polònia","Denmark":"Dinamarca",
+  "Norway":"Noruega","Sweden":"Suècia","Finland":"Finlàndia","Estonia":"Estònia","Latvia":"Letònia","Lithuania":"Lituània","Hungary":"Hongria",
+  "Croatia":"Croàcia","Slovenia":"Eslovènia","Slovakia":"Eslovàquia","Serbia":"Sèrbia","Bosnia and Herz.":"Bòsnia i Hercegovina","Montenegro":"Montenegro",
+  "Albania":"Albània","Greece":"Grècia","Turkey":"Turquia","Bulgaria":"Bulgària","Romania":"Romania","Morocco":"Marroc","Algeria":"Algèria",
+  "Tunisia":"Tunísia","Libya":"Líbia","Egypt":"Egipte","Israel":"Israel","Iceland":"Islàndia","Luxembourg":"Luxemburg","Andorra":"Andorra",
+  "Monaco":"Mònaco","Malta":"Malta","Cyprus":"Xipre","N. Cyprus":"Xipre","Macedonia":"Macedònia del Nord","Moldova":"Moldàvia","Ukraine":"Ucraïna",
+  "Belarus":"Bielorússia","Russia":"Rússia","Jordan":"Jordània","Lebanon":"Líban","Syria":"Síria","Kosovo":"Kosovo","W. Sahara":"Sàhara Occidental",
+  "Saudi Arabia":"Aràbia Saudita","Georgia":"Geòrgia","Iraq":"Iraq","Iran":"Iran","United Arab Emirates":"Emirats Àrabs Units","Kuwait":"Kuwait",
+  "Qatar":"Qatar","Oman":"Oman","Bahrain":"Bahrain","United States of America":"Estats Units","Canada":"Canadà","Greenland":"Groenlàndia",
+  "Faeroe Is.":"Illes Fèroe","San Marino":"San Marino","Vatican":"Vaticà","Liechtenstein":"Liechtenstein","Palestine":"Palestina","Armenia":"Armènia","Azerbaijan":"Azerbaidjan"
+};
+
+/* ---------- Utilitats ---------- */
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function ara() { return Date.now(); }
+function fmtCompte(ms) {
+  ms = Math.max(0, ms); const t = Math.ceil(ms / 1000);
+  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+  return (h ? h + ":" + String(m).padStart(2, "0") : String(m).padStart(2, "0")) + ":" + String(s).padStart(2, "0");
+}
+function fmtKm(n) { return Math.round(n || 0).toLocaleString("ca-ES"); }
+function fmtHora(ms) { const d = new Date(ms); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+function fmtData(ms) { const d = new Date(ms); return String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0"); }
+function clauDia(ms) { const d = new Date(ms); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
+function hash(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function rnd(seed) { let a = seed >>> 0; return function () { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function nouId() { return "AL" + String(100 + Math.floor(Math.random() * 900)); }
+function prefs(k, v) { try { if (v === undefined) return localStorage.getItem("altitud." + k); localStorage.setItem("altitud." + k, v); } catch (e) { return null; } }
+function distancia(a, b) {
+  const dLat = (b.lat - a.lat) * RAD, dLon = (b.lon - a.lon) * RAD;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * RAD) * Math.cos(b.lat * RAD) * Math.sin(dLon / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+function interpRuta(o, d, t) {
+  if (window.d3) { const p = d3.geoInterpolate([o.lon, o.lat], [d.lon, d.lat])(t); return { lon: p[0], lat: p[1] }; }
+  return { lon: o.lon + (d.lon - o.lon) * t, lat: o.lat + (d.lat - o.lat) * t };
+}
+/* Posició aproximada del sol (punt subsolar) */
+function sol(ms) {
+  const d = new Date(ms); const inici = Date.UTC(d.getUTCFullYear(), 0, 0);
+  const n = (ms - inici) / 864e5;
+  const decl = 23.44 * Math.sin(TAU * (284 + n) / 365);
+  const h = d.getUTCHours() + d.getUTCMinutes() / 60 + d.getUTCSeconds() / 3600;
+  let lon = -15 * (h - 12); lon = ((lon + 540) % 360) - 180;
+  return { lat: decl, lon: lon };
+}
+function elevacioSol(lat, lon, ms) {
+  const s = sol(ms);
+  const v = Math.sin(lat * RAD) * Math.sin(s.lat * RAD) + Math.cos(lat * RAD) * Math.cos(s.lat * RAD) * Math.cos((lon - s.lon) * RAD);
+  return Math.asin(Math.max(-1, Math.min(1, v))) / RAD;
+}
+function nomMar(lat, lon) {
+  if (lat > 41 && lat < 47.5 && lon > 27 && lon < 42) return "Mar Negre";
+  if (lat > 40 && lat < 46 && lon > 12 && lon < 20) return "Mar Adriàtic";
+  if (lat > 53 && lon > 10 && lon < 30) return "Mar Bàltic";
+  if (lat > 51 && lat < 61 && lon > -4 && lon < 10) return "Mar del Nord";
+  if (lat > 30 && lat < 46 && lon > -5.5 && lon < 36) return "Mar Mediterrani";
+  if (lon < -5.5 || (lat > 43 && lon < -1)) return "Oceà Atlàntic";
+  if (lat < 30 && lon > 32 && lon < 44) return "Mar Roig";
+  return "Mar obert";
+}
+
+/* ---------- Estat ---------- */
+const DIARI_BUIT = { km: 0, minuts: 0, ubicacio: "BCN", visitades: ["BCN"], segells: {}, vols: [] };
+let vol = { estat: "terra" };
+let diari = JSON.parse(JSON.stringify(DIARI_BUIT));
+const tria = { durada: 45, desti: null, motiu: "Estudi", objectiu: "", seient: null, idProv: nouId(), mesDestins: false };
+let mobilPeer = null, refs = null, remot = false, room = null;
+const peerLocal = "p" + Math.random().toString(36).slice(2, 10);
+let pestanya = prefs("tab") || "vol";
+let modeCam = prefs("cam") || "seguir", lliure = false, zoomMult = 1;
+let finestraOn = prefs("finestra") !== "0";
+let ultimaTurb = 0;
+
+function origenActual() { return PER_CODI[diari.ubicacio] || PER_CODI.BCN; }
+function horesTotals() { return (diari.minuts || 0) / 60; }
+function candidats(n) {
+  const o = origenActual(); const objectiu = tria.durada * KM_PER_MIN;
+  return CIUTATS.filter(c => c[0] !== o.codi).map(c => ({ c: PER_CODI[c[0]], km: distancia(o, PER_CODI[c[0]]) }))
+    .sort((a, b) => Math.abs(a.km - objectiu) - Math.abs(b.km - objectiu)).slice(0, n).sort((a, b) => a.km - b.km);
+}
+
+/* ---------- Seients ---------- */
+const FILES = 30, SORTIDES = [10, 11];
+function classeDeFila(f) { return f <= 3 ? "Business" : f <= 8 ? "Preferent" : "Turista"; }
+const DESBLOQ = { Business: 20, Preferent: 5, Turista: 0 };
+function classeDisponible(c) { return horesTotals() >= DESBLOQ[c]; }
+function lletres(f) { return f <= 3 ? ["F", "D", "C", "A"] : ["F", "E", "D", "C", "B", "A"]; }
+function ocupat(seed, s) { return rnd(hash(seed + s))() < 0.36; }
+function tipusSeient(s) { const l = String(s || "").slice(-1); return (l === "A" || l === "F") ? "finestra" : (l === "C" || l === "D") ? "passadís" : "mig"; }
+function seientPerDefecte(seed) {
+  const r = rnd(hash(seed + "def"));
+  for (let k = 0; k < 200; k++) {
+    const f = 9 + Math.floor(r() * 22), l = r() < 0.5 ? "A" : "F", s = f + l;
+    if (!ocupat(seed, s)) return s;
+  }
+  return "24A";
+}
+
+/* ---------- Emmagatzematge ---------- */
+function refLocal(clau) {
+  const fills = []; let dades = null;
+  try { const t = localStorage.getItem("altitud.db." + clau); if (t) dades = JSON.parse(t); } catch (e) {}
+  const snap = () => ({ exists: !!dades, data: () => dades ? JSON.parse(JSON.stringify(dades)) : undefined });
+  const emet = () => { const s = snap(); fills.forEach(f => f(s)); };
+  const desa = () => { try { localStorage.setItem("altitud.db." + clau, JSON.stringify(dades)); } catch (e) {} };
+  return {
+    get: async () => snap(),
+    set: async (d) => { dades = JSON.parse(JSON.stringify(d)); desa(); emet(); },
+    update: async (d) => { dades = Object.assign({}, dades || {}, JSON.parse(JSON.stringify(d))); desa(); emet(); },
+    onSnapshot: (f) => { fills.push(f); setTimeout(() => f(snap()), 0); return () => {}; },
+    acquire: async () => ({ acquired: true })
+  };
+}
+async function iniciaStore() {
+  let db = null, user = null, uid = null;
+  try {
+    if (window.claude && window.claude.use) {
+      [db, user, room] = await Promise.all([window.claude.use("db"), window.claude.use("user"), window.claude.use("room")]);
+      if (user) uid = await user.id();
+    }
+  } catch (e) { db = null; }
+  if (db && uid) { remot = true; refs = { vol: db.doc("data/users/" + uid + "/vol"), diari: db.doc("data/users/" + uid + "/diari") }; }
+  else { refs = { vol: refLocal("vol"), diari: refLocal("diari") }; }
+  refs.vol.onSnapshot(s => { vol = s.exists ? s.data() : { estat: "terra" }; brut = true; renderTot(); }, () => {});
+  refs.diari.onSnapshot(s => {
+    diari = Object.assign(JSON.parse(JSON.stringify(DIARI_BUIT)), s.exists ? s.data() : {});
+    brut = true; renderTot();
+  }, () => {});
+  iniciaRoom();
+}
+let roomIniciat = false;
+function iniciaRoom() {
+  if (!room || roomIniciat) return; roomIniciat = true;
+  try {
+    const llegeix = (peers) => {
+      mobilPeer = (peers || []).find(p => p.isMe && !p.sameTab && p.presence && p.presence.rol === "mobil") || null;
+      renderXip(); if (vol.estat === "embarcament") renderVol(true);
+    };
+    if (esMobil) enviaPresencia();
+    llegeix(room.peers());
+    room.onPeers(ch => llegeix(ch.peers), () => {});
+  } catch (e) {}
+}
+function enviaPresencia() { if (room && esMobil) room.presence({ rol: "mobil", visible: !document.hidden, aBord: aBord }).catch(() => {}); }
+
+/* ---------- Accions de vol ---------- */
+async function emetreTargeta() {
+  if (!refs) return;
+  const o = origenActual(), d = PER_CODI[tria.desti]; if (!d) return;
+  if (!tria.seient || ocupat(tria.idProv, tria.seient)) tria.seient = seientPerDefecte(tria.idProv);
+  const fila = parseInt(tria.seient, 10);
+  await refs.vol.set({
+    estat: "embarcament", id: tria.idProv, origen: o.codi, desti: d.codi, km: Math.round(distancia(o, d)),
+    durada: tria.durada, motiu: tria.motiu, objectiu: tria.objectiu.trim().slice(0, 90),
+    seient: tria.seient, classe: classeDeFila(fila),
+    porta: "ABCDE"[hash(tria.idProv) % 5] + (1 + hash(tria.idProv + "p") % 40),
+    reservatAt: ara(), mobil: false, turbulencies: []
+  });
+  tria.idProv = nouId(); tria.seient = null; tria.objectiu = "";
+}
+async function enlairar(ambMobil) {
+  if (vol.estat !== "embarcament") return;
+  await refs.vol.update({ estat: "en_vol", iniciAt: ara(), mobil: !!ambMobil });
+}
+async function cancelar() { await refs.vol.set({ estat: "terra" }); }
+
+let tancant = false, ultimIntent = 0;
+async function tancarVol(complet) {
+  if (tancant || vol.estat !== "en_vol" || !refs) return;
+  if (complet && ara() - ultimIntent < 4000) return;
+  ultimIntent = ara(); tancant = true;
+  try {
+    const l = await refs.vol.acquire({ holder: peerLocal, ttlMs: 15000 });
+    if (!l.acquired) return;
+    const s = await refs.vol.get(); const v = s.exists ? s.data() : null;
+    if (!v || v.estat !== "en_vol") return;
+    const fi = v.iniciAt + v.durada * 60000, t = Math.min(ara(), fi);
+    const frac = Math.max(0, Math.min(1, (t - v.iniciAt) / (v.durada * 60000)));
+    const esComplet = complet && frac >= 1;
+    const minuts = Math.round((t - v.iniciAt) / 60000), km = Math.round(v.km * frac);
+    const tl = v.turbulencies || [];
+    const ds = await refs.diari.get();
+    const dd = Object.assign(JSON.parse(JSON.stringify(DIARI_BUIT)), ds.exists ? ds.data() : {});
+    const entrada = { at: v.iniciAt, id: v.id, origen: v.origen, desti: v.desti, motiu: v.motiu, minuts, km, turb: tl.length, complet: esComplet,
+      seient: v.seient || "", classe: v.classe || "Turista", objectiu: v.objectiu || "", objectiuFet: null, mobil: !!v.mobil, durada: v.durada };
+    const visitades = (dd.visitades || []).slice(); const segells = Object.assign({}, dd.segells || {});
+    if (esComplet) { if (visitades.indexOf(v.desti) < 0) visitades.push(v.desti); if (!segells[v.desti]) segells[v.desti] = ara(); }
+    await refs.diari.set({ km: (dd.km || 0) + km, minuts: (dd.minuts || 0) + minuts, ubicacio: esComplet ? v.desti : (dd.ubicacio || "BCN"),
+      visitades, segells, vols: [entrada].concat(dd.vols || []).slice(0, 80) });
+    await refs.vol.set(Object.assign({}, v, { estat: "aterrat", resum: { complet: esComplet, km, minuts, turb: tl.length, segonsFora: tl.reduce((a, x) => a + (x.s || 0), 0) } }));
+    if (esComplet) avisCabina("Hem aterrat a " + PER_CODI[v.desti].nom + ". Benvingut, i bona feina.");
+  } catch (e) {} finally { tancant = false; }
+}
+async function marcaObjectiu(fet) {
+  const ds = await refs.diari.get(); if (!ds.exists) return;
+  const dd = ds.data(); const vs = (dd.vols || []).slice();
+  const i = vs.findIndex(x => x.id === vol.id && x.at === vol.iniciAt); if (i < 0) return;
+  vs[i] = Object.assign({}, vs[i], { objectiuFet: fet });
+  await refs.diari.update({ vols: vs });
+  await refs.vol.update({ objectiuFet: fet });
+}
+async function ferEscala(min) { await refs.vol.set({ estat: "escala", fiAt: ara() + min * 60000, a: vol.desti || diari.ubicacio, min }); }
+async function nouVol() { tria.desti = null; await refs.vol.set({ estat: "terra" }); }
+
+/* ---------- Mode mòbil ---------- */
+let esMobil = false;
+(function () {
+  const m = prefs("mode");
+  try { esMobil = m ? m === "mobil" : matchMedia("(pointer: coarse) and (max-width: 820px)").matches; } catch (e) {}
+  if (location.hash === "#mobil") esMobil = true;
+})();
+let aBord = false, wake = null, sortidaAt = null;
+async function demanaWake() { try { if (navigator.wakeLock) { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => { wake = null; clauMobil = ""; }); } } catch (e) { wake = null; } }
+async function checkIn() {
+  aBord = true; await demanaWake(); enviaPresencia();
+  if (vol.estat === "embarcament") await enlairar(true);
+  else if (vol.estat === "en_vol" && !vol.mobil) await refs.vol.update({ mobil: true });
+  clauMobil = ""; renderTot();
+}
+document.addEventListener("visibilitychange", async () => {
+  if (!esMobil) return;
+  enviaPresencia();
+  if (!aBord || vol.estat !== "en_vol") return;
+  if (document.hidden) { sortidaAt = ara(); return; }
+  if (!wake) demanaWake();
+  if (sortidaAt) {
+    const s = Math.round((ara() - sortidaAt) / 1000), quan = sortidaAt; sortidaAt = null;
+    if (s >= 2 && vol.estat === "en_vol") { try { await refs.vol.update({ turbulencies: (vol.turbulencies || []).concat([{ at: quan, s }]) }); } catch (e) {} }
+  }
+});
+function canviaMode(m) { prefs("mode", m); esMobil = m === "mobil"; clauMobil = ""; brut = true; renderTot(); if (esMobil) enviaPresencia(); setTimeout(mida, 0); }
+
+/* ---------- So ---------- */
+const so = {
+  ctx: null, nodes: null, actual: null, mode: prefs("so") || "silenci",
+  assegura() { if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (this.ctx && this.ctx.state === "suspended") this.ctx.resume(); return this.ctx; },
+  soroll(tipus) {
+    const ctx = this.ctx, len = ctx.sampleRate * 4, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; if (tipus === "motor") { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.4; } else d[i] = w * 0.5; }
+    return buf;
+  },
+  aplica() {
+    const vull = (vol.estat === "en_vol" && !esMobil) ? this.mode : "silenci";
+    if (vull === this.actual) return;
+    this.para(); this.actual = vull;
+    if (vull === "silenci" || !this.ctx) return;
+    const ctx = this.ctx, src = ctx.createBufferSource(); src.buffer = this.soroll(vull); src.loop = true;
+    const f1 = ctx.createBiquadFilter(), g = ctx.createGain();
+    if (vull === "motor") { f1.type = "lowpass"; f1.frequency.value = 420; } else { f1.type = "bandpass"; f1.frequency.value = 2400; f1.Q.value = 0.4; }
+    g.gain.value = 0; g.gain.linearRampToValueAtTime(vull === "motor" ? 0.5 : 0.22, ctx.currentTime + 2);
+    src.connect(f1); f1.connect(g); g.connect(ctx.destination); src.start();
+    this.nodes = { src, g };
+  },
+  para() { if (!this.nodes) return; const n = this.nodes; this.nodes = null; try { n.g.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.8); setTimeout(() => { try { n.src.stop(); } catch (e) {} }, 1000); } catch (e) {} },
+  ding() {
+    const ctx = this.ctx; if (!ctx || this.mode === "silenci") return;
+    [[880, 0], [698, 0.42]].forEach(([f, t]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; o.type = "sine";
+      g.gain.setValueAtTime(0, ctx.currentTime + t); g.gain.linearRampToValueAtTime(0.16, ctx.currentTime + t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 1.3);
+      o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 1.4);
+    });
+  }
+};
+$("sel-so").value = so.mode;
+$("sel-so").addEventListener("change", (e) => { so.mode = e.target.value; prefs("so", so.mode); so.assegura(); so.actual = null; so.aplica(); });
+document.addEventListener("pointerdown", () => { so.assegura(); so.actual = null; so.aplica(); }, { once: true });
+
+/* ---------- Avisos de cabina ---------- */
+let toastT = null;
+function avisCabina(text) {
+  if (esMobil) return;
+  $("toast-text").textContent = text; $("toast").hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => { $("toast").hidden = true; }, 7000);
+  so.ding();
+}
+const anunciats = {};
+function revisaAnuncis(s) {
+  if (!vol.id || esMobil) return;
+  const L = [0, 0.1, 0.5, 0.9];
+  const clau = vol.id + vol.iniciAt;
+  let fet = anunciats[clau];
+  if (!fet) { fet = anunciats[clau] = new Set(); L.forEach(l => { if (s.p > l + 0.01) fet.add(l); }); }
+  const d = PER_CODI[vol.desti];
+  for (const l of L) {
+    if (s.p >= l && !fet.has(l)) {
+      fet.add(l);
+      if (l === 0) avisCabina("Benvingut a bord del vol " + vol.id + " cap a " + d.nom + ". Seient " + vol.seient + ". Durada prevista: " + vol.durada + " minuts.");
+      if (l === 0.1) avisCabina("Hem assolit l'altitud de creuer. És hora de concentrar-se" + (vol.objectiu ? ": " + vol.objectiu : "") + ".");
+      if (l === 0.5) avisCabina("Som a mig camí" + (sobrevol.nom ? ", sobrevolant " + sobrevol.nom : "") + ". Continua així.");
+      if (l === 0.9) avisCabina("Iniciem el descens cap a " + d.nom + ". Queden " + Math.max(1, Math.round(s.resta / 60000)) + " minuts.");
+    }
+  }
+}
+
+/* ---------- Física del vol ---------- */
+function estatVol() {
+  if (vol.estat !== "en_vol") return { p: 0, resta: 0, alt: CREUER, vel: 780, fase: "Creuer", fi: ara() };
+  const total = vol.durada * 60000, fet = ara() - vol.iniciAt;
+  const p = Math.max(0, Math.min(1, fet / total));
+  const e = (x) => x * x * (3 - 2 * x);
+  let alt, vel, fase;
+  if (p < 0.1) { alt = CREUER * e(p / 0.1); vel = 280 + 500 * e(p / 0.1); fase = "Ascens"; }
+  else if (p > 0.9) { alt = CREUER * e((1 - p) / 0.1); vel = 260 + 520 * e((1 - p) / 0.1); fase = "Descens"; }
+  else { alt = CREUER; vel = 780; fase = "Creuer"; }
+  return { p, resta: total - fet, alt, vel, fase, fi: vol.iniciAt + total };
+}
+function posicioAvio() {
+  if (!vol.origen) return null;
+  const o = PER_CODI[vol.origen], d = PER_CODI[vol.desti];
+  let p = 0;
+  if (vol.estat === "en_vol") p = estatVol().p;
+  else if (vol.estat === "aterrat") p = vol.resum && vol.km ? Math.min(1, (vol.resum.km || 0) / vol.km) : 1;
+  return Object.assign(interpRuta(o, d, p), { p });
+}
+
+/* ---------- Mapa ---------- */
+const mapa = { p110: null, f110: null, p50: null, f50: null, perId50: {} };
+let sobrevol = { nom: "", f: null, terra: false };
+let poblacions = [];
+async function carregaMapa() {
+  if (!window.d3 || !window.topojson) return;
+  fetch("ciutats.json").then(r => r.json()).then(d => { poblacions = d; brut = true; }).catch(() => {});
+  try {
+    const w = await (await fetch("countries-110m.json")).json();
+    mapa.p110 = topojson.feature(w, w.objects.countries); mapa.f110 = topojson.mesh(w, w.objects.countries, (a, b) => a !== b);
+    brut = true;
+    const w2 = await (await fetch("countries-50m.json")).json();
+    mapa.p50 = topojson.feature(w2, w2.objects.countries); mapa.f50 = topojson.mesh(w2, w2.objects.countries, (a, b) => a !== b);
+    mapa.p50.features.forEach(f => { mapa.perId50[f.id + "|" + f.properties.name] = f; });
+    sobrevol.f = null; brut = true;
+  } catch (e) {}
+}
+function actualitzaSobrevol(pos) {
+  if (!pos || !window.d3) return;
+  const P = mapa.p50 || mapa.p110; if (!P) return;
+  const pt = [pos.lon, pos.lat];
+  const cp = ciutatPropera(pos); sobrevol.prop = cp;
+  if (sobrevol.f && d3.geoContains(sobrevol.f, pt)) return;
+  const f = P.features.find(x => d3.geoContains(x, pt)) || null;
+  sobrevol = { f, nom: f ? (PAISOS[f.properties.name] || f.properties.name) : nomMar(pos.lat, pos.lon), terra: !!f, prop: cp };
+  brut = true;
+}
+function ciutatPropera(pos) {
+  let millor = null, dm = 1e9;
+  for (let i = 0; i < poblacions.length; i++) {
+    const c = poblacions[i]; if (Math.abs(c[1] - pos.lat) > 1.2 || Math.abs(c[2] - pos.lon) > 1.8) continue;
+    const d = distancia(pos, { lat: c[1], lon: c[2] }); if (d < dm) { dm = d; millor = c; }
+  }
+  return millor && dm < 90 ? { nom: millor[0], km: dm } : null;
+}
+
+const cv = $("globus"), ctx = cv.getContext("2d");
+let W = 0, H = 0, DPR = 1, brut = true;
+const cam = { lon: 6, lat: 44, R: 900, g: 0, oy: 0 };
+let proj = null, cami = null;
+if (window.d3) { proj = d3.geoOrthographic().clipAngle(90).precision(0.6); cami = d3.geoPath(proj, ctx); }
+const graticula = window.d3 ? d3.geoGraticule10() : null;
+function mida() {
+  const r = cv.getBoundingClientRect(); DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = r.width; H = r.height; cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); brut = true;
+}
+function zonaVisible() {
+  const ample = window.innerWidth >= 900;
+  const esq = ample ? 404 + 32 : 0, dalt = ample ? 64 : 104;
+  const baix = vol.estat === "en_vol" ? (ample ? 130 : 120) : 16;
+  return { cx: (esq + W) / 2, cy: (dalt + H - baix) / 2, w: Math.max(100, W - esq), h: Math.max(100, H - dalt - baix) };
+}
+function rutaActiva() {
+  if (vol.origen && vol.estat !== "terra" && vol.estat !== "escala") return [PER_CODI[vol.origen], PER_CODI[vol.desti]];
+  if (vol.estat === "terra" && tria.desti) return [origenActual(), PER_CODI[tria.desti]];
+  return null;
+}
+function objectiuCam() {
+  const z = zonaVisible(), base = Math.min(z.w, z.h) / 2;
+  if (vol.estat === "en_vol" && (modeCam === "seguir" || modeCam === "pilot")) {
+    const p = posicioAvio();
+    if (modeCam === "seguir") return { lon: p.lon, lat: p.lat, R: base * 12 * zoomMult, g: 0, oy: 0 };
+    const o = PER_CODI[vol.origen], d = PER_CODI[vol.desti];
+    const n = interpRuta(o, d, Math.min(1, p.p + 0.003)), b = interpRuta(o, d, Math.max(0, p.p - 0.003));
+    const pr = d3.geoOrthographic().scale(1000).translate([0, 0]).rotate([-p.lon, -p.lat, 0]);
+    const A = pr([b.lon, b.lat]), B = pr([n.lon, n.lat]);
+    const a0 = Math.atan2(B[1] - A[1], B[0] - A[0]) / RAD;
+    return { lon: p.lon, lat: p.lat, R: base * 26 * zoomMult, g: a0 + 90, oy: z.h * 0.24 };
+  }
+  const r = rutaActiva();
+  if (r && window.d3) {
+    const a = d3.geoDistance([r[0].lon, r[0].lat], [r[1].lon, r[1].lat]);
+    const m = d3.geoInterpolate([r[0].lon, r[0].lat], [r[1].lon, r[1].lat])(0.5);
+    const R = Math.max(base * 0.95, Math.min(base * 40, base * 0.78 / Math.sin(Math.min(a / 2 + 0.05, 1.35))));
+    return { lon: m[0], lat: m[1], R: R * zoomMult, g: 0, oy: 0 };
+  }
+  const o = origenActual(); return { lon: o.lon + 6, lat: o.lat + 2, R: base * 2.4 * zoomMult, g: 0, oy: 0 };
+}
+function mouCamera() {
+  if (lliure) return false;
+  const t = objectiuCam(); const k = 0.075;
+  const dl = ((t.lon - cam.lon + 540) % 360) - 180;
+  const dlat = t.lat - cam.lat, dr = Math.log(t.R / cam.R);
+  const dg = ((t.g - cam.g + 540) % 360) - 180, doy = t.oy - cam.oy;
+  cam.lon += dl * k; cam.lat += dlat * k; cam.R *= Math.exp(dr * k); cam.g += dg * k; cam.oy += doy * k;
+  return Math.abs(dl) > 0.002 || Math.abs(dlat) > 0.002 || Math.abs(dr) > 0.002 || Math.abs(dg) > 0.05 || Math.abs(doy) > 0.5;
+}
+function textEscala() {
+  const km = 6371 * (Math.min(W, H) / 2) / cam.R * 2;
+  return km > 1500 ? Math.round(km / 100) * 100 + " km" : km > 150 ? Math.round(km / 10) * 10 + " km" : Math.round(km) + " km";
+}
+function dibuixaAvio(x, y, ang, escala) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.scale(escala, escala);
+  ctx.shadowColor = "rgba(255,181,71,.8)"; ctx.shadowBlur = 14;
+  ctx.fillStyle = "#FFB547"; ctx.strokeStyle = "#050A14"; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(0, -12); ctx.bezierCurveTo(1.6, -11, 1.6, -8, 1.6, -4); ctx.lineTo(11, 2); ctx.lineTo(11, 4); ctx.lineTo(1.6, 1.5);
+  ctx.lineTo(1.4, 7.5); ctx.lineTo(4.5, 10); ctx.lineTo(4.5, 11.5); ctx.lineTo(0, 10.3); ctx.lineTo(-4.5, 11.5); ctx.lineTo(-4.5, 10);
+  ctx.lineTo(-1.4, 7.5); ctx.lineTo(-1.6, 1.5); ctx.lineTo(-11, 4); ctx.lineTo(-11, 2); ctx.lineTo(-1.6, -4); ctx.bezierCurveTo(-1.6, -8, -1.6, -11, 0, -12);
+  ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0; ctx.stroke(); ctx.restore();
+}
+function visibleGeo(lon, lat) { return d3.geoDistance([lon, lat], [cam.lon, cam.lat]) < Math.PI / 2 - 0.02; }
+
+function dibuixaGlobus(t) {
+  if (!W) return;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = "#050A14"; ctx.fillRect(0, 0, W, H);
+  if (!proj) { ctx.fillStyle = "#8D9DB6"; ctx.font = "14px Manrope, sans-serif"; ctx.fillText("No s'ha pogut carregar el mapa.", 24, H - 40); return; }
+  const z = zonaVisible();
+  proj.rotate([-cam.lon, -cam.lat, cam.g]).scale(cam.R).translate([z.cx, z.cy + cam.oy]);
+  if (cam.R < Math.max(W, H) * 1.4) {
+    const g = ctx.createRadialGradient(z.cx, z.cy, cam.R * 0.96, z.cx, z.cy, cam.R * 1.16);
+    g.addColorStop(0, "rgba(116,200,255,.30)"); g.addColorStop(1, "rgba(116,200,255,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(z.cx, z.cy, cam.R * 1.16, 0, TAU); ctx.fill();
+  }
+  ctx.beginPath(); cami({ type: "Sphere" }); ctx.fillStyle = "#0A1830"; ctx.fill();
+  ctx.beginPath(); cami(graticula); ctx.strokeStyle = "rgba(140,175,220,.07)"; ctx.lineWidth = 0.7; ctx.stroke();
+  const detall = mapa.p50 && cam.R > Math.min(W, H) * 1.5;
+  const P = detall ? mapa.p50 : mapa.p110, F = detall ? mapa.f50 : mapa.f110;
+  if (P) {
+    ctx.beginPath(); cami(P); ctx.fillStyle = "#1B2E49"; ctx.fill(); ctx.strokeStyle = "rgba(150,190,240,.28)"; ctx.lineWidth = 0.7; ctx.stroke();
+    if (sobrevol.f && vol.estat === "en_vol") {
+      const f = detall ? (mapa.perId50[sobrevol.f.id + "|" + sobrevol.f.properties.name] || sobrevol.f) : sobrevol.f;
+      ctx.beginPath(); cami(f); ctx.fillStyle = "#24405F"; ctx.fill();
+    }
+    ctx.beginPath(); cami(F); ctx.strokeStyle = "rgba(140,175,220,.24)"; ctx.lineWidth = 0.8; ctx.stroke();
+  }
+  const s = sol(ara()); const anti = [s.lon + 180, -s.lat];
+  ctx.fillStyle = "rgba(1,3,10,.14)";
+  [90, 86, 82].forEach(r => { ctx.beginPath(); cami(d3.geoCircle().center(anti).radius(r)()); ctx.fill(); });
+
+  const r = rutaActiva();
+  const pos = (vol.estat === "en_vol" || vol.estat === "aterrat") ? posicioAvio() : null;
+  if (r) {
+    const [o, d] = r;
+    ctx.setLineDash([5, 7]); ctx.strokeStyle = "rgba(255,181,71,.55)"; ctx.lineWidth = 1.8;
+    ctx.beginPath(); cami({ type: "LineString", coordinates: [[o.lon, o.lat], [d.lon, d.lat]] }); ctx.stroke(); ctx.setLineDash([]);
+    if (pos && pos.p > 0.0005) {
+      const ln = { type: "LineString", coordinates: [[o.lon, o.lat], [pos.lon, pos.lat]] };
+      ctx.strokeStyle = "rgba(255,181,71,.22)"; ctx.lineWidth = 8; ctx.beginPath(); cami(ln); ctx.stroke();
+      ctx.strokeStyle = "#FFB547"; ctx.lineWidth = 2.6; ctx.beginPath(); cami(ln); ctx.stroke();
+    }
+  }
+  const vis = new Set(diari.visitades || []);
+  const base = Math.min(z.w, z.h) / 2;
+  const totes = cam.R > base * 3;
+  if (poblacions.length && cam.R > base * 6) {
+    const rang = Math.asin(Math.min(1, Math.hypot(W, H) / cam.R)) / RAD + 0.5;
+    const ocupat_ = []; let n = 0;
+    CIUTATS.forEach(c => { if (!visibleGeo(c[3], c[2])) return; const q = proj([c[3], c[2]]); if (q) ocupat_.push([q[0] - 8, q[1] - 10, q[0] + 110, q[1] + 10]); });
+    const minPob = cam.R > base * 30 ? 0 : cam.R > base * 16 ? 60 : cam.R > base * 10 ? 150 : 400;
+    ctx.font = "500 11px Manrope, sans-serif"; ctx.textBaseline = "middle";
+    for (let i = 0; i < poblacions.length && n < 70; i++) {
+      const c = poblacions[i]; if (c[3] < minPob) break;
+      if (Math.abs(c[1] - cam.lat) > rang || Math.abs(((c[2] - cam.lon + 540) % 360) - 180) > rang / Math.max(0.2, Math.cos(cam.lat * RAD))) continue;
+      if (PER_CODI_NOM[c[0]]) continue;
+      const q = proj([c[2], c[1]]); if (!q || q[0] < 0 || q[0] > W || q[1] < 0 || q[1] > H) continue;
+      const w = ctx.measureText(c[0]).width + 12, caixa = [q[0] - 3, q[1] - 8, q[0] + w, q[1] + 8];
+      if (ocupat_.some(o => !(caixa[2] < o[0] || caixa[0] > o[2] || caixa[3] < o[1] || caixa[1] > o[3]))) continue;
+      ocupat_.push(caixa); n++;
+      ctx.beginPath(); ctx.arc(q[0], q[1], c[3] > 500 ? 2.4 : 1.8, 0, TAU); ctx.fillStyle = "rgba(200,214,235,.55)"; ctx.fill();
+      ctx.fillStyle = c[3] > 500 ? "rgba(200,214,235,.75)" : "rgba(200,214,235,.5)"; ctx.fillText(c[0], q[0] + 6, q[1]);
+    }
+  }
+  ctx.textBaseline = "middle";
+  CIUTATS.forEach(c => {
+    const ci = PER_CODI[c[0]];
+    if (!visibleGeo(ci.lon, ci.lat)) return;
+    const q = proj([ci.lon, ci.lat]); if (!q || q[0] < -40 || q[0] > W + 40 || q[1] < -40 || q[1] > H + 40) return;
+    const clau = r && (ci.codi === r[0].codi || ci.codi === r[1].codi);
+    const aqui = ci.codi === diari.ubicacio;
+    ctx.beginPath(); ctx.arc(q[0], q[1], clau ? 4.5 : 2.6, 0, TAU);
+    ctx.fillStyle = clau ? "#E9EFF8" : vis.has(ci.codi) ? "#74C8FF" : "rgba(233,239,248,.35)"; ctx.fill();
+    if (clau) { ctx.beginPath(); ctx.arc(q[0], q[1], 9, 0, TAU); ctx.strokeStyle = "rgba(233,239,248,.5)"; ctx.lineWidth = 1; ctx.stroke(); }
+    if (clau || aqui || totes) {
+      ctx.font = clau ? "600 13px Manrope, sans-serif" : "500 11px Manrope, sans-serif";
+      ctx.fillStyle = clau ? "#E9EFF8" : "rgba(200,214,235,.7)";
+      ctx.fillText(clau || cam.R > base * 6 ? ci.nom : ci.codi, q[0] + (clau ? 14 : 7), q[1]);
+    }
+  });
+  if (pos && r && visibleGeo(pos.lon, pos.lat)) {
+    const [o, d] = r;
+    const a = proj([pos.lon, pos.lat]);
+    const p2 = interpRuta(o, d, Math.min(1, pos.p + 0.002)), p0 = interpRuta(o, d, Math.max(0, pos.p - 0.002));
+    const b = proj([p2.lon, p2.lat]), c = proj([p0.lon, p0.lat]);
+    const ang = Math.atan2(b[1] - c[1], b[0] - c[0]);
+    if (vol.estat === "en_vol") {
+      const pul = (t / 1600) % 1;
+      ctx.beginPath(); ctx.arc(a[0], a[1], 10 + pul * 26, 0, TAU); ctx.strokeStyle = "rgba(255,181,71," + (0.45 * (1 - pul)) + ")"; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    dibuixaAvio(a[0], a[1], ang, cam.R > base * 20 ? 2.1 : cam.R > base * 4 ? 1.6 : 1.1);
+  }
+}
+
+/* Interacció amb el globus */
+let arr = null;
+cv.addEventListener("pointerdown", (e) => { arr = { x: e.clientX, y: e.clientY, lon: cam.lon, lat: cam.lat, mogut: false }; try { cv.setPointerCapture(e.pointerId); } catch (er) {} });
+cv.addEventListener("pointermove", (e) => {
+  if (!arr) return;
+  const dx = e.clientX - arr.x, dy = e.clientY - arr.y;
+  if (!arr.mogut && Math.hypot(dx, dy) < 4) return;
+  if (!lliure) { cam.g = 0; cam.oy = 0; }
+  arr.mogut = true; setLliure(true);
+  const f = 180 / Math.PI / cam.R;
+  cam.lon = arr.lon - dx * f; cam.lat = Math.max(-80, Math.min(80, arr.lat + dy * f)); brut = true;
+});
+cv.addEventListener("pointerup", () => { arr = null; });
+cv.addEventListener("pointercancel", () => { arr = null; });
+cv.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const f = Math.exp(-e.deltaY * 0.0015);
+  fesZoom(f);
+}, { passive: false });
+function setLliure(v) { lliure = v; $("b-recentrar").hidden = !v; }
+document.querySelectorAll("[data-cam]").forEach(b => b.addEventListener("click", () => {
+  modeCam = b.dataset.cam; prefs("cam", modeCam); zoomMult = 1; setLliure(false); brut = true;
+  document.querySelectorAll("[data-cam]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+}));
+$("b-recentrar").addEventListener("click", () => { zoomMult = 1; setLliure(false); });
+function fesZoom(f) {
+  if (lliure) cam.R = Math.max(150, Math.min(80000, cam.R * f));
+  else zoomMult = Math.max(0.2, Math.min(6, zoomMult * f));
+  brut = true;
+}
+$("z-mes").addEventListener("click", () => fesZoom(1.6));
+$("z-menys").addEventListener("click", () => fesZoom(1 / 1.6));
+document.querySelectorAll("[data-cam]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.cam === modeCam)));
+
+/* ---------- Finestreta ---------- */
+const cf = $("c-finestra"), fx = cf.getContext("2d");
+let FW = 0, FH = 0;
+const nuvols = [];
+(function () { const r = rnd(7); for (let i = 0; i < 16; i++) nuvols.push({ x: r() * 1.4, y: r(), s: 0.5 + r() * 0.9, v: 0.4 + r() * 0.8, n: 3 + Math.floor(r() * 4), o: r() }); })();
+const estrelles = []; (function () { const r = rnd(11); for (let i = 0; i < 60; i++) estrelles.push([r(), r() * 0.6, r()]); })();
+const llums = []; (function () { const r = rnd(23); for (let i = 0; i < 70; i++) llums.push([r(), r(), r()]); })();
+function midaFinestra() { const r = cf.getBoundingClientRect(); FW = r.width; FH = r.height; if (FW) { cf.width = Math.round(FW * DPR); cf.height = Math.round(FH * DPR); } }
+function barreja(a, b, t) { return a.map((x, i) => Math.round(x + (b[i] - x) * t)); }
+function rgb(c, a) { return "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + (a == null ? 1 : a) + ")"; }
+let ultimF = 0, desplac = 0;
+function dibuixaFinestra(t) {
+  if (!FW) midaFinestra(); if (!FW) return;
+  const dt = Math.min(0.1, (t - ultimF) / 1000); ultimF = t;
+  const s = estatVol(), pos = posicioAvio() || origenActual();
+  const el = elevacioSol(pos.lat, pos.lon, ara());
+  const dia = Math.max(0, Math.min(1, (el + 4) / 14)), posta = Math.max(0, 1 - Math.abs(el - 2) / 9);
+  const costat = /[A-C]$/.test(vol.seient || "") ? -1 : 1;
+  fx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  let inclina = s.fase === "Ascens" ? -7 : s.fase === "Descens" ? 4 : Math.sin(t / 4200) * 1.2;
+  inclina *= costat;
+  const sacseig = ara() - ultimaTurb < 9000 ? (Math.sin(t / 37) + Math.sin(t / 23)) * 3 : 0;
+  fx.save(); fx.translate(FW / 2, FH / 2); fx.rotate(inclina * RAD); fx.translate(-FW / 2 + sacseig * 0.4, -FH / 2 + sacseig);
+  const hy = FH * (0.6 - 0.22 * (1 - s.alt / CREUER));
+  const dalt = barreja(barreja([3, 7, 20], [40, 62, 120], posta * 0.8), [38, 112, 200], dia * (1 - posta * 0.5));
+  const baix = barreja(barreja([12, 22, 48], [246, 154, 90], posta), [160, 206, 240], dia * (1 - posta * 0.6));
+  const g = fx.createLinearGradient(0, -40, 0, hy); g.addColorStop(0, rgb(dalt)); g.addColorStop(1, rgb(baix));
+  fx.fillStyle = g; fx.fillRect(-40, -40, FW + 80, hy + 40);
+  if (dia < 0.4) estrelles.forEach(e => { fx.fillStyle = "rgba(255,255,255," + ((0.4 - dia) * 2 * (0.4 + 0.6 * Math.abs(Math.sin(t / 900 + e[2] * 9)))) + ")"; fx.fillRect(e[0] * FW, e[1] * hy, 1.2, 1.2); });
+  if (el > -3 && el < 25) {
+    const sx = FW * (0.5 + 0.25 * costat), sy = hy - el * 4;
+    const gs = fx.createRadialGradient(sx, sy, 0, sx, sy, 70); gs.addColorStop(0, "rgba(255,236,190,.9)"); gs.addColorStop(0.2, "rgba(255,200,120,.4)"); gs.addColorStop(1, "rgba(255,170,90,0)");
+    fx.fillStyle = gs; fx.fillRect(-40, -40, FW + 80, FH + 80);
+  }
+  const tc = sobrevol.terra ? barreja([8, 12, 18], [78, 104, 74], dia) : barreja([5, 10, 22], [32, 76, 118], dia);
+  const g2 = fx.createLinearGradient(0, hy, 0, FH + 40); g2.addColorStop(0, rgb(barreja(tc, baix, 0.55))); g2.addColorStop(1, rgb(tc));
+  fx.fillStyle = g2; fx.fillRect(-40, hy, FW + 80, FH + 80);
+  desplac += dt * (s.vel / 780) * 0.05 * costat;
+  if (sobrevol.terra && dia < 0.5) llums.forEach(l => {
+    const x = (((l[0] + desplac * 0.6) % 1) + 1) % 1 * (FW + 40) - 20, y = hy + 8 + l[1] * (FH - hy);
+    fx.fillStyle = "rgba(255,200,120," + ((0.5 - dia) * 1.6 * (0.3 + l[2] * 0.7)) + ")"; fx.beginPath(); fx.arc(x, y, 0.8 + l[2], 0, TAU); fx.fill();
+  });
+  const nc = barreja([70, 80, 100], [255, 255, 255], Math.max(dia, posta * 0.7));
+  nuvols.forEach(n => {
+    n.x = (n.x + dt * n.v * (s.vel / 780) * 0.07 * costat + 1.4) % 1.4;
+    const x = (n.x - 0.2) * FW * 1.2, y = hy - 30 + n.y * (FH - hy + 60), sz = n.s * 26;
+    fx.fillStyle = rgb(nc, 0.16 + 0.22 * n.o);
+    for (let k = 0; k < n.n; k++) { fx.beginPath(); fx.ellipse(x + k * sz * 0.7, y + Math.sin(k * 1.7) * sz * 0.2, sz, sz * 0.45, 0, 0, TAU); fx.fill(); }
+  });
+  fx.restore();
+  if (tipusSeient(vol.seient) === "finestra") {
+    const wx = costat < 0 ? FW : 0, dir = costat < 0 ? -1 : 1;
+    fx.fillStyle = dia > 0.3 ? "rgb(150,160,175)" : "rgb(22,28,40)";
+    fx.beginPath(); fx.moveTo(wx, FH * 0.8); fx.lineTo(wx + dir * FW * 0.95, FH * 0.9); fx.lineTo(wx + dir * FW, FH * 0.94); fx.lineTo(wx, FH * 1.02); fx.closePath(); fx.fill();
+    if ((t % 1300) < 120) { fx.fillStyle = costat < 0 ? "rgba(255,70,70,.95)" : "rgba(70,255,140,.95)"; fx.beginPath(); fx.arc(wx + dir * FW * 0.96, FH * 0.915, 3, 0, TAU); fx.fill(); }
+  }
+}
+
+/* ---------- Render: pestanya Vol ---------- */
+const AVIO_SVG = '<svg viewBox="0 0 50 22" aria-hidden="true"><path d="M2 11h40" stroke="currentColor" stroke-dasharray="3 3"/><path d="M38 5l10 6-10 6z" fill="currentColor"/></svg>';
+function htmlTargeta(v) {
+  const o = PER_CODI[v.origen], d = PER_CODI[v.desti];
+  return '<div class="targeta" data-c="' + esc(v.classe) + '">' +
+    '<div class="targeta-cap"><span>' + esc(v.classe || "Turista").toUpperCase() + ' · EMBARCAMENT</span><span>' + esc(v.id) + '</span></div>' +
+    '<div class="ruta"><div><div class="codi">' + o.codi + '</div><div class="ciutat">' + esc(o.nom) + '</div></div>' + AVIO_SVG +
+    '<div class="dreta"><div class="codi">' + d.codi + '</div><div class="ciutat">' + esc(d.nom) + '</div></div></div>' +
+    '<div class="camps"><div><span class="eyebrow">Durada</span><b>' + v.durada + ' min</b></div><div><span class="eyebrow">Porta</span><b>' + esc(v.porta) + '</b></div>' +
+    '<div><span class="eyebrow">Seient</span><b>' + esc(v.seient) + '</b></div><div><span class="eyebrow">Motiu</span><b>' + esc(v.motiu) + '</b></div></div>' +
+    (v.objectiu ? '<div class="objectiu-linia">Objectiu: <b>' + esc(v.objectiu) + '</b></div>' : '') +
+    '<div class="perfora"></div><div class="matriu"><span class="mono" style="font-size:12px">' + fmtKm(v.km) + ' km · ' + fmtHora(v.reservatAt || ara()) + '</span><div class="codi-barres"></div></div></div>';
+}
+const AJUDA = '<details class="ajuda"><summary>Com enllaçar el mòbil</summary><ol>' +
+  '<li>Obre aquest mateix artifact al mòbil, amb el teu compte de Claude.</li>' +
+  '<li>Quan emetis la targeta, toca <b>Fer check-in</b> al mòbil i deixa\'l cap per avall amb la pantalla encesa.</li>' +
+  '<li>Si surts de l\'app al mòbil, el vol registra <b>turbulències</b> i les veuràs aquí.</li></ol></details>';
+
+let clauVol = "";
+function renderVol(forca) {
+  const el = $("tab-vol"), e = vol.estat || "terra";
+  if (e === "terra") {
+    if (!forca && clauVol === "terra" && el.contains(document.activeElement) && document.activeElement.id === "in-obj") return;
+    const c = candidats(tria.mesDestins ? 9 : 6);
+    if (!tria.desti || !c.some(x => x.c.codi === tria.desti)) tria.desti = c.length ? c[0].c.codi : null;
+    if (!tria.seient || ocupat(tria.idProv, tria.seient) || !classeDisponible(classeDeFila(parseInt(tria.seient, 10)))) tria.seient = seientPerDefecte(tria.idProv);
+    const cl = classeDeFila(parseInt(tria.seient, 10));
+    el.innerHTML =
+      '<div class="bloc"><div class="bloc-cap"><span class="eyebrow">Durada</span><span class="durada-gran"><span id="dur-n">' + tria.durada + '</span><small>min</small></span></div>' +
+      '<div class="xips mono">' + DURADES.map(d => '<button type="button" data-dur="' + d + '" aria-pressed="' + (d === tria.durada) + '">' + d + '</button>').join("") + '</div>' +
+      '<input type="range" id="dur-rang" min="10" max="240" step="5" value="' + tria.durada + '" aria-label="Durada en minuts"></div>' +
+      '<div class="bloc"><div class="bloc-cap"><span class="eyebrow">Destinació des de ' + esc(origenActual().nom) + '</span><span class="eyebrow">≈ ' + fmtKm(tria.durada * KM_PER_MIN) + ' km</span></div>' +
+      '<div class="destins">' + c.map(x => '<button type="button" class="desti" data-desti="' + x.c.codi + '" aria-pressed="' + (x.c.codi === tria.desti) + '"><b>' + x.c.codi + '</b><span>' + esc(x.c.nom) + '</span><em>' + fmtKm(x.km) + ' km</em></button>').join("") + '</div>' +
+      '<button type="button" class="canvi-mode" id="b-mes" style="align-self:flex-start;padding:0">' + (tria.mesDestins ? "Mostrar-ne menys" : "Més destinacions") + '</button></div>' +
+      '<div class="bloc"><span class="eyebrow">Seient</span><div class="seient-fila"><span class="seient-codi">' + esc(tria.seient) + '</span><span class="seient-info"><span class="classe-tag" data-c="' + cl + '">' + cl + '</span><span>' + tipusSeient(tria.seient) + (SORTIDES.indexOf(parseInt(tria.seient, 10)) >= 0 ? " · fila de sortida" : "") + '</span></span><button type="button" class="secundari" id="b-seient">Canviar</button></div></div>' +
+      '<div class="bloc"><span class="eyebrow">Motiu</span><div class="xips">' + MOTIUS.map(m => '<button type="button" data-motiu="' + esc(m) + '" aria-pressed="' + (m === tria.motiu) + '">' + esc(m) + '</button>').join("") + '</div>' +
+      '<input type="text" id="in-obj" maxlength="90" placeholder="Objectiu del vol (p. ex. acabar el lab 3 de XC)" value="' + esc(tria.objectiu) + '"></div>' +
+      '<button type="button" class="primari" id="b-emetre"' + (tria.desti ? "" : " disabled") + '>Emetre targeta d\'embarcament</button>' + AJUDA;
+    clauVol = "terra";
+  } else if (e === "embarcament") {
+    const k = "emb" + vol.id + (mobilPeer ? "m" : "");
+    if (k === clauVol && !forca) return; clauVol = k;
+    el.innerHTML = '<div class="bloc-cap"><h2>Embarcament</h2><span class="eyebrow">Porta ' + esc(vol.porta) + '</span></div>' + htmlTargeta(vol) +
+      (mobilPeer ? '<div class="avis" data-s="ok"><span class="punt"></span><div><b>Mòbil enllaçat</b>Toca «Fer check-in» al mòbil i el vol s\'enlairarà sol.</div></div>'
+                 : '<div class="avis"><span class="punt"></span><div><b>Esperant el mòbil</b>Obre Altitud al mòbil i fes el check-in, o enlaira\'t sense ell.</div></div>') +
+      '<div class="fila-botons"><button type="button" class="secundari" id="b-cancel">Cancel·lar</button><button type="button" class="primari" id="b-enlairar">' + (mobilPeer ? "Enlairar sense check-in" : "Enlairar ara") + '</button></div>' + AJUDA;
+  } else if (e === "en_vol") {
+    const k = "vol" + vol.id + vol.iniciAt;
+    if (k !== clauVol || forca) {
+      clauVol = k;
+      el.innerHTML = '<div class="bloc-cap"><h2>En vol cap a ' + esc(PER_CODI[vol.desti].nom) + '</h2><span class="eyebrow">' + esc(vol.id) + '</span></div>' +
+        '<div class="llista-dades">' +
+        '<div><span class="eyebrow">Seient</span><b>' + esc(vol.seient) + ' · ' + esc(vol.classe) + '</b></div><div><span class="eyebrow">Motiu</span><b>' + esc(vol.motiu) + '</b></div>' +
+        '<div><span class="eyebrow">Sortida</span><b>' + fmtHora(vol.iniciAt) + '</b></div><div><span class="eyebrow">Distància</span><b>' + fmtKm(vol.km) + ' km</b></div></div>' +
+        (vol.objectiu ? '<div class="bloc"><span class="eyebrow">Objectiu</span><div style="font-size:15px;font-weight:600">' + esc(vol.objectiu) + '</div></div>' : '') +
+        '<div class="avis" id="v-mobil"><span class="punt"></span><div><b id="v-mobil-t"></b><span id="v-mobil-s"></span></div></div>' +
+        '<div class="turbs" id="v-turbs"></div>' +
+        '<button type="button" class="secundari perill" id="b-emerg">Aterratge d\'emergència</button>';
+    }
+  } else if (e === "aterrat") {
+    const k = "at" + vol.id + (vol.objectiuFet == null ? "" : vol.objectiuFet);
+    if (k === clauVol && !forca) return; clauVol = k;
+    const r = vol.resum || {}, d = PER_CODI[vol.desti], o = PER_CODI[vol.origen];
+    const est = !r.complet ? "emerg" : r.turb ? "turb" : "net";
+    const txt = !r.complet ? "Emergència" : r.turb ? r.turb + (r.turb === 1 ? " turbulència" : " turbulències") : "Vol net";
+    el.innerHTML = '<span class="eyebrow">' + esc(vol.id) + ' · ' + o.codi + ' → ' + d.codi + '</span>' +
+      '<h2 style="font-size:28px">' + (r.complet ? "Benvingut a " + esc(d.nom) : "Aterratge prop de " + esc(o.nom)) + '</h2>' +
+      '<div><span class="estampa" data-s="' + est + '">' + txt + '</span></div>' +
+      '<div class="xifres"><div><span class="eyebrow">Minuts</span><b>' + (r.minuts || 0) + '</b></div><div><span class="eyebrow">Km</span><b>' + fmtKm(r.km) + '</b></div><div><span class="eyebrow">Fora</span><b>' + (r.segonsFora || 0) + ' s</b></div></div>' +
+      (vol.objectiu ? '<div class="bloc"><span class="eyebrow">Objectiu</span><div style="font-weight:600">' + esc(vol.objectiu) + '</div>' +
+        (vol.objectiuFet == null ? '<div class="fila-botons"><button type="button" class="secundari" data-obj="0">No l\'he acabat</button><button type="button" class="secundari" data-obj="1" style="border-color:var(--ok);color:var(--ok)">Fet!</button></div>'
+          : '<span class="etiq ' + (vol.objectiuFet ? "net" : "turb") + '" style="align-self:flex-start">' + (vol.objectiuFet ? "Objectiu complert" : "Objectiu pendent") + '</span>') + '</div>' : '') +
+      '<div class="bloc"><span class="eyebrow">I ara?</span><div class="fila-botons"><button type="button" class="secundari" data-escala="5">Escala de 5 min</button><button type="button" class="secundari" data-escala="10">Escala de 10 min</button></div>' +
+      '<button type="button" class="primari" id="b-nou">Reservar un altre vol</button></div>';
+  } else if (e === "escala") {
+    const k = "esc" + vol.fiAt;
+    if (k !== clauVol || forca) {
+      clauVol = k;
+      el.innerHTML = '<span class="eyebrow">Escala a ' + esc((PER_CODI[vol.a] || origenActual()).nom) + '</span><h2>Estira les cames</h2>' +
+        '<div class="escala-compte" id="esc-compte">--:--</div><p style="margin:0;color:var(--suau)">Aixeca\'t, beu aigua i mira lluny de la pantalla. Quan s\'acabi, podràs reservar el vol següent.</p>' +
+        '<button type="button" class="secundari" id="b-nou">Acabar l\'escala ara</button>';
+    }
+  }
+}
+$("tab-vol").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button"); if (!b) return;
+  if (b.dataset.dur) { tria.durada = +b.dataset.dur; tria.desti = null; renderVol(true); brut = true; return; }
+  if (b.dataset.desti) { tria.desti = b.dataset.desti; renderVol(true); brut = true; return; }
+  if (b.dataset.motiu) { tria.motiu = b.dataset.motiu; renderVol(true); return; }
+  if (b.dataset.obj) { marcaObjectiu(b.dataset.obj === "1"); return; }
+  if (b.dataset.escala) { ferEscala(+b.dataset.escala); return; }
+  if (b.id === "b-mes") { tria.mesDestins = !tria.mesDestins; renderVol(true); }
+  else if (b.id === "b-seient") obreSeients();
+  else if (b.id === "b-emetre") emetreTargeta();
+  else if (b.id === "b-cancel") cancelar();
+  else if (b.id === "b-enlairar") enlairar(false);
+  else if (b.id === "b-emerg") $("velo-emerg").hidden = false;
+  else if (b.id === "b-nou") nouVol();
+});
+$("tab-vol").addEventListener("input", (ev) => {
+  if (ev.target.id === "dur-rang") { tria.durada = +ev.target.value; $("dur-n").textContent = tria.durada; }
+  if (ev.target.id === "in-obj") tria.objectiu = ev.target.value;
+});
+$("tab-vol").addEventListener("change", (ev) => { if (ev.target.id === "dur-rang") { tria.desti = null; renderVol(true); brut = true; } });
+$("dlg-no").addEventListener("click", () => { $("velo-emerg").hidden = true; });
+$("dlg-si").addEventListener("click", () => { $("velo-emerg").hidden = true; tancarVol(false); });
+
+/* ---------- Plànol de seients ---------- */
+let seientTemp = null;
+function obreSeients() {
+  seientTemp = tria.seient;
+  const h = horesTotals();
+  $("seients-info").textContent = "Vol " + tria.idProv + " · " + h.toFixed(1).replace(".", ",") + " h acumulades";
+  $("seients-nota").textContent = h < DESBLOQ.Preferent ? "Preferent es desbloqueja a les 5 h de vol i Business a les 20 h." : h < DESBLOQ.Business ? "Business es desbloqueja a les 20 h de vol." : "Tens totes les classes desbloquejades.";
+  let html = "";
+  for (let f = 1; f <= FILES; f++) {
+    const cl = classeDeFila(f), ls = lletres(f), ample = f <= 3, disp = classeDisponible(cl);
+    if (f === 4 || f === 9) html += '<span class="separador"></span>';
+    html += '<div class="fila' + (ample ? " ample-f" : "") + (SORTIDES.indexOf(f) >= 0 ? " sortida" : "") + '">';
+    ls.forEach((l, i) => {
+      if ((ample && i === 2) || (!ample && i === 3)) html += '<span class="num">' + f + '</span>';
+      const s = f + l, oc = ocupat(tria.idProv, s);
+      html += '<button type="button" class="st' + (oc ? " ocupat" : "") + (!disp && !oc ? " bloc" : "") + '" data-c="' + cl + '" data-s="' + s + '" aria-label="Seient ' + s + ' ' + cl + (oc ? ", ocupat" : !disp ? ", bloquejat" : "") + '" aria-pressed="' + (s === seientTemp) + '"' + (oc || !disp ? " disabled" : "") + '>' + l + '</button>';
+    });
+    html += '</div>';
+  }
+  $("fuselatge").innerHTML = html;
+  $("velo-seients").hidden = false;
+  const sel = $("fuselatge").querySelector('[aria-pressed="true"]'); if (sel) sel.scrollIntoView({ block: "nearest", inline: "center" });
+}
+$("fuselatge").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button.st"); if (!b || b.disabled) return;
+  seientTemp = b.dataset.s;
+  $("fuselatge").querySelectorAll("button.st").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+});
+$("seients-no").addEventListener("click", () => { $("velo-seients").hidden = true; });
+$("seients-si").addEventListener("click", () => { tria.seient = seientTemp; $("velo-seients").hidden = true; renderVol(true); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { $("velo-seients").hidden = true; $("velo-emerg").hidden = true; } });
+
+/* ---------- Render: Diari ---------- */
+function ratxa() {
+  const dies = new Set((diari.vols || []).filter(v => v.minuts >= 10).map(v => clauDia(v.at)));
+  let n = 0; const d = new Date(); d.setHours(12, 0, 0, 0);
+  if (!dies.has(clauDia(d.getTime()))) d.setDate(d.getDate() - 1);
+  while (dies.has(clauDia(d.getTime()))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+function renderDiari() {
+  const vs = diari.vols || [];
+  const h = horesTotals();
+  let html = '<div class="bloc-cap"><h2>Diari de vol</h2>' + (remot ? "" : '<span class="eyebrow">Només en aquest navegador</span>') + '</div>' +
+    '<div class="totals"><div><span class="eyebrow">Hores</span><b>' + (h < 10 ? h.toFixed(1).replace(".", ",") : Math.round(h)) + '</b></div>' +
+    '<div><span class="eyebrow">Quilòmetres</span><b>' + fmtKm(diari.km) + '</b></div><div><span class="eyebrow">Vols</span><b>' + vs.length + '</b></div>' +
+    '<div><span class="eyebrow">Ratxa</span><b>' + ratxa() + ' <small class="mono" style="font-size:12px;color:var(--suau)">dies</small></b></div></div>';
+  const dies = []; const avui = new Date(); avui.setHours(12, 0, 0, 0);
+  const NOMS = ["dg", "dl", "dt", "dc", "dj", "dv", "ds"];
+  for (let i = 6; i >= 0; i--) { const d = new Date(avui); d.setDate(d.getDate() - i); dies.push({ k: clauDia(d.getTime()), n: NOMS[d.getDay()], m: 0 }); }
+  vs.forEach(v => { const x = dies.find(d => d.k === clauDia(v.at)); if (x) x.m += v.minuts || 0; });
+  const max = Math.max(60, ...dies.map(d => d.m));
+  const bw = 30, gap = 14, hh = 90;
+  let svg = '<svg viewBox="0 0 ' + (7 * bw + 6 * gap) + ' ' + (hh + 34) + '" role="img" aria-label="Minuts de concentració dels últims 7 dies">';
+  dies.forEach((d, i) => {
+    const x = i * (bw + gap), bh = d.m ? Math.max(3, d.m / max * hh) : 3;
+    svg += '<rect class="barra' + (d.m ? "" : " buida") + '" x="' + x + '" y="' + (hh + 14 - bh) + '" width="' + bw + '" height="' + bh + '" rx="5"/>';
+    if (d.m) svg += '<text class="valor" x="' + (x + bw / 2) + '" y="' + (hh + 8 - bh) + '" text-anchor="middle">' + d.m + '</text>';
+    svg += '<text x="' + (x + bw / 2) + '" y="' + (hh + 30) + '" text-anchor="middle">' + (i === 6 ? "avui" : d.n) + '</text>';
+  });
+  svg += '</svg>';
+  html += '<div class="bloc"><span class="eyebrow">Minuts · últims 7 dies</span><div class="grafic">' + svg + '</div></div>';
+  const pm = {}; vs.forEach(v => { pm[v.motiu] = (pm[v.motiu] || 0) + (v.minuts || 0); });
+  const ll = Object.entries(pm).sort((a, b) => b[1] - a[1]).slice(0, 6); const mx = ll.length ? Math.max(1, ll[0][1]) : 1;
+  if (ll.length) html += '<div class="bloc"><span class="eyebrow">Temps per motiu</span><div class="motius-barres">' +
+    ll.map(([m, n]) => '<div class="motiu-barra"><span>' + esc(m) + '</span><div><i style="width:' + Math.max(3, n / mx * 100) + '%"></i></div><span class="mono" style="font-size:12px;color:var(--suau)">' + (n >= 60 ? (n / 60).toFixed(1).replace(".", ",") + " h" : n + " min") + '</span></div>').join("") + '</div></div>';
+  html += '<div class="bloc"><span class="eyebrow">Vols recents</span>' + (vs.length ? '<div class="vols-llista">' + vs.slice(0, 15).map(v => {
+    const cls = !v.complet ? "emerg" : v.turb ? "turb" : "net", tx = !v.complet ? "Emergència" : v.turb ? v.turb + " turb." : "Net";
+    const sub = esc(v.motiu) + " · " + v.minuts + " min" + (v.objectiu ? " · " + (v.objectiuFet === true ? "✓ " : v.objectiuFet === false ? "✗ " : "") + esc(v.objectiu) : "");
+    return '<div class="vol-fila"><span class="data">' + fmtData(v.at) + '</span><div style="min-width:0"><div class="rt">' + esc(v.origen) + ' → ' + esc(v.desti) + '</div><div class="sub">' + sub + '</div></div><span class="etiq ' + cls + '">' + tx + '</span></div>';
+  }).join("") + '</div>' : '<p class="buit">Encara no hi ha vols. El primer sortirà des de Barcelona.</p>') + '</div>';
+  $("tab-diari").innerHTML = html;
+}
+
+/* ---------- Render: Passaport ---------- */
+const IC = {
+  avio: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 15.5v-2l-8-5V3.2a1.5 1.5 0 0 0-3 0V8.5l-8 5v2l8-2.5v5.3l-2 1.5V21l3.5-1 3.5 1v-1.2l-2-1.5V13z"/></svg>',
+  calma: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>',
+  rellotge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  globus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>',
+  foc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-3 2-4 2-6 2 1 3 3 3 3s1-4 0-7z"/></svg>',
+  mobil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>',
+  estrella: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>',
+  diana: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>'
+};
+function insignies() {
+  const vs = diari.vols || [], ok = vs.filter(v => v.complet);
+  const h = horesTotals();
+  return [
+    { ic: "avio", nom: "Primer enlairament", desc: "Completa el teu primer vol.", v: ok.length, max: 1 },
+    { ic: "calma", nom: "Aire en calma", desc: "5 vols complets sense turbulències.", v: ok.filter(v => !v.turb).length, max: 5 },
+    { ic: "mobil", nom: "Pantalla negra", desc: "3 vols amb el mòbil a bord i cap turbulència.", v: ok.filter(v => v.mobil && !v.turb).length, max: 3 },
+    { ic: "rellotge", nom: "Pilot de creuer", desc: "Acumula 10 hores de vol.", v: Math.floor(h * 10) / 10, max: 10 },
+    { ic: "estrella", nom: "Comandant", desc: "Acumula 50 hores de vol.", v: Math.floor(h * 10) / 10, max: 50 },
+    { ic: "globus", nom: "Rodamón", desc: "Aterra a 10 ciutats diferents.", v: Object.keys(diari.segells || {}).length, max: 10 },
+    { ic: "foc", nom: "Set dies seguits", desc: "Vola almenys 10 minuts cada dia durant una setmana.", v: ratxa(), max: 7 },
+    { ic: "diana", nom: "Missió complerta", desc: "Marca 10 objectius com a fets.", v: vs.filter(v => v.objectiuFet === true).length, max: 10 },
+    { ic: "avio", nom: "Llarg recorregut", desc: "Completa un vol de 2 hores o més.", v: ok.filter(v => (v.durada || v.minuts) >= 120).length, max: 1 }
+  ];
+}
+function renderPassaport() {
+  const seg = diari.segells || {};
+  const codis = Object.keys(seg).filter(c => PER_CODI[c]).sort((a, b) => seg[b] - seg[a]);
+  const ins = insignies(), fetes = ins.filter(i => i.v >= i.max).length;
+  let html = '<div class="bloc-cap"><h2>Passaport</h2><span class="eyebrow">' + codis.length + ' / ' + (CIUTATS.length - 1) + ' ciutats</span></div>';
+  const buits = Math.max(0, 3 - codis.length);
+  html += '<div class="segells">' + codis.map(c => {
+    const ci = PER_CODI[c], rot = (hash(c) % 17) - 8;
+    return '<div class="segell c' + (hash(c) % 4) + '" style="transform:rotate(' + rot + 'deg)"><b>' + c + '</b><span>' + esc(ci.nom) + '</span><em>' + fmtData(seg[c]) + '</em></div>';
+  }).join("") + Array.from({ length: buits }, () => '<div class="segell buit"><span>Pròxim segell</span></div>').join("") + '</div>';
+  html += '<div class="bloc"><div class="bloc-cap"><span class="eyebrow">Insígnies</span><span class="eyebrow">' + fetes + ' / ' + ins.length + '</span></div><div class="insignies">' +
+    ins.map(i => { const f = i.v >= i.max; return '<div class="insignia' + (f ? " feta" : "") + '"><span class="ic">' + IC[i.ic] + '</span><div><b>' + esc(i.nom) + '</b><p>' + esc(i.desc) + (f ? "" : " · " + String(i.v).replace(".", ",") + "/" + i.max) + '</p>' + (f ? "" : '<div class="prog"><i style="width:' + Math.min(100, i.v / i.max * 100) + '%"></i></div>') + '</div></div>'; }).join("") +
+    '</div></div>';
+  $("tab-passaport").innerHTML = html;
+}
+function mostraPestanya(t) {
+  pestanya = t; prefs("tab", t);
+  document.querySelectorAll("[data-tab]").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
+  ["vol", "diari", "passaport"].forEach(k => { $("tab-" + k).hidden = k !== t; });
+}
+document.querySelectorAll("[data-tab]").forEach(b => b.addEventListener("click", () => mostraPestanya(b.dataset.tab)));
+
+function renderXip() {
+  const x = $("xip-mobil"), t = $("xip-text");
+  if (!mobilPeer) { x.dataset.s = "cap"; t.textContent = remot ? "Mòbil no enllaçat" : "Mòbil: només a Claude"; return; }
+  const p = mobilPeer.presence || {};
+  if (p.visible === false) { x.dataset.s = "fora"; t.textContent = "Mòbil fora de cabina"; }
+  else { x.dataset.s = "ok"; t.textContent = p.aBord ? "Mòbil a bord" : "Mòbil enllaçat"; }
+}
+
+/* ---------- Pantalla mòbil ---------- */
+const vm = $("vista-mobil");
+let clauMobil = "";
+function renderMobil() {
+  const e = vol.estat || "terra";
+  const k = e + (vol.id || "") + (vol.fiAt || "") + (aBord ? "b" : "") + (wake ? "w" : "") + (remot ? "r" : "") + (vol.objectiuFet == null ? "" : vol.objectiuFet) + (diari.minuts || 0);
+  if (k === clauMobil) return; clauMobil = k;
+  vm.classList.toggle("en-vol", e === "en_vol");
+  const cap = '<div class="mobil-cap"><span class="marca" style="font-size:18px">' + IC.avio.replace("<svg", '<svg style="width:22px;height:22px;color:var(--ambre)"') + 'Altitud</span><span class="eyebrow">' + (remot ? "Enllaçat" : "Sense compte") + '</span></div>';
+  const peu = '<button type="button" class="canvi-mode" id="m-mode">Veure la versió completa</button>';
+  let cos = "";
+  if (!remot) cos = '<div class="mobil-centre"><h2>Enllaç no disponible aquí</h2><p>L\'enllaç entre el mòbil i l\'ordinador funciona quan obres Altitud des de Claude, amb la sessió iniciada als dos dispositius.</p></div>';
+  else if (e === "terra") cos = '<div class="mobil-centre"><span class="eyebrow">Ets a ' + esc(origenActual().nom) + '</span><h2 style="font-size:28px">Cap vol programat</h2><p>Reserva el vol a l\'ordinador. Quan emetis la targeta, aquí apareixerà el botó de check-in.</p>' +
+    '<div class="xifres" style="text-align:left;margin-top:12px"><div><span class="eyebrow">Hores</span><b>' + horesTotals().toFixed(1).replace(".", ",") + '</b></div><div><span class="eyebrow">Ratxa</span><b>' + ratxa() + '</b></div><div><span class="eyebrow">Ciutats</span><b>' + Object.keys(diari.segells || {}).length + '</b></div></div></div>';
+  else if (e === "embarcament") cos = '<div class="mobil-centre" style="text-align:left">' + htmlTargeta(vol) + '<p style="text-align:center">En fer el check-in el vol s\'enlaira. Deixa el mòbil cap per avall amb la pantalla encesa fins que aterris.</p><button type="button" class="primari" id="m-checkin">Fer check-in</button></div>';
+  else if (e === "en_vol") {
+    const o = PER_CODI[vol.origen], d = PER_CODI[vol.desti];
+    cos = '<div class="mobil-centre"><div class="ruta-linia">' + o.codi + ' <span style="color:var(--suau)">→</span> <em>' + d.codi + '</em></div>' +
+      '<div class="compte" id="m-compte">--:--</div><div class="barra-m"><i id="m-barra" style="width:0%"></i></div>' +
+      (vol.objectiu ? '<p>Objectiu: <b style="color:var(--text)">' + esc(vol.objectiu) + '</b></p>' : '') +
+      (aBord ? '<svg class="icona-gira" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="22" y="8" width="20" height="36" rx="4"/><path d="M14 52c8 6 28 6 36 0"/><path d="M46 48l4 4-5 2"/></svg><p><b style="color:var(--text)">Mode avió actiu.</b> Gira el mòbil cap per avall. Si surts d\'aquesta pantalla, el vol registra turbulències.</p>' +
+          (wake ? "" : '<p style="color:var(--alerta)">Aquest mòbil no pot mantenir la pantalla encesa sol. Desactiva el bloqueig automàtic durant el vol.</p>')
+        : '<p>Aquest vol ja està en marxa. Toca el botó per posar el mòbil en mode avió.</p><button type="button" class="primari" id="m-checkin">Tornar a cabina</button>') +
+      '<p class="mono" id="m-turbs" style="font-size:12.5px"></p></div>';
+  } else if (e === "aterrat") {
+    const r = vol.resum || {}, d = PER_CODI[vol.desti];
+    aBord = false; if (wake) { try { wake.release(); } catch (er) {} wake = null; }
+    cos = '<div class="mobil-centre"><span class="eyebrow">' + esc(vol.id) + '</span><h2 style="font-size:30px">' + (r.complet ? "Benvingut a " + esc(d.nom) : "Vol interromput") + '</h2>' +
+      '<div><span class="estampa" data-s="' + (!r.complet ? "emerg" : r.turb ? "turb" : "net") + '">' + (!r.complet ? "Emergència" : r.turb ? r.turb + " turbulències" : "Vol net") + '</span></div>' +
+      '<p>' + (r.minuts || 0) + ' minuts de concentració · ' + fmtKm(r.km) + ' km</p>' +
+      (vol.objectiu && vol.objectiuFet == null ? '<p>Has complert l\'objectiu?</p><div class="fila-botons"><button type="button" class="secundari" data-obj="0">Encara no</button><button type="button" class="secundari" data-obj="1">Fet!</button></div>' : '') +
+      '<div class="fila-botons"><button type="button" class="secundari" data-escala="5">Escala de 5 min</button><button type="button" class="primari" id="m-nou">Fet</button></div></div>';
+  } else if (e === "escala") {
+    cos = '<div class="mobil-centre"><span class="eyebrow">Escala</span><h2>Estira les cames</h2><div class="compte" id="m-esc">--:--</div><p>Aixeca\'t, beu aigua i mira lluny de la pantalla.</p><button type="button" class="secundari" id="m-nou">Acabar l\'escala</button></div>';
+  }
+  vm.innerHTML = cap + cos + peu;
+}
+vm.addEventListener("click", (ev) => {
+  const b = ev.target.closest("button"); if (!b) return;
+  if (b.id === "m-checkin") checkIn();
+  else if (b.id === "m-nou") nouVol();
+  else if (b.id === "m-mode") canviaMode("escriptori");
+  else if (b.dataset.obj) marcaObjectiu(b.dataset.obj === "1");
+  else if (b.dataset.escala) ferEscala(+b.dataset.escala);
+});
+
+/* ---------- Render general i rellotge ---------- */
+function renderTot() {
+  $("escriptori").hidden = esMobil; vm.hidden = !esMobil;
+  if (esMobil) { renderMobil(); tick(); return; }
+  renderVol(); renderDiari(); renderPassaport(); renderXip();
+  const o = origenActual(); $("pos-codi").textContent = o.codi; $("pos-nom").textContent = o.nom;
+  const envol = vol.estat === "en_vol";
+  $("hud").hidden = !envol; $("escena").classList.toggle("volant", envol);
+  $("b-finestra").disabled = !envol;
+  $("finestra").hidden = !(envol && finestraOn);
+  if (envol) { $("h-o").textContent = vol.origen; $("h-d").textContent = vol.desti; $("h-obj").textContent = vol.objectiu ? "Objectiu: " + vol.objectiu : ""; $("finestra-peu").textContent = "Seient " + vol.seient + " · " + tipusSeient(vol.seient); }
+  else document.title = "Altitud";
+  const tl = vol.turbulencies || [];
+  if (envol && tl.length) {
+    const ult = tl[tl.length - 1];
+    if (ult.at + ult.s * 1000 > ultimaTurb) {
+      const recent = ara() - (ult.at + ult.s * 1000) < 60000;
+      ultimaTurb = recent ? ara() : ult.at + ult.s * 1000;
+      if (recent) avisCabina("Turbulències: el mòbil ha sortit de la cabina " + ult.s + " segons. Torna a concentrar-te.");
+    }
+  }
+  so.aplica();
+}
+$("b-finestra").addEventListener("click", () => {
+  finestraOn = !finestraOn; prefs("finestra", finestraOn ? "1" : "0");
+  $("b-finestra").setAttribute("aria-pressed", String(finestraOn)); $("finestra").hidden = !(finestraOn && vol.estat === "en_vol");
+  if (finestraOn) setTimeout(midaFinestra, 0);
+});
+$("b-finestra").setAttribute("aria-pressed", String(finestraOn));
+
+let ultimSobrevol = 0;
+function tick() {
+  if (vol.estat === "escala") {
+    const r = vol.fiAt - ara(), t = fmtCompte(r);
+    if ($("esc-compte")) $("esc-compte").textContent = t; if ($("m-esc")) $("m-esc").textContent = t;
+    if (r <= 0 && refs && ara() - ultimIntent > 4000) { ultimIntent = ara(); refs.vol.get().then(s => { const v = s.exists ? s.data() : null; if (v && v.estat === "escala" && v.fiAt <= ara()) refs.vol.set({ estat: "terra" }); }); }
+    return;
+  }
+  if (vol.estat !== "en_vol") return;
+  const s = estatVol();
+  if (s.resta <= 0) tancarVol(true);
+  const pos = posicioAvio();
+  if (ara() - ultimSobrevol > 2000) { ultimSobrevol = ara(); actualitzaSobrevol(pos); }
+  if (esMobil) {
+    if ($("m-compte")) { $("m-compte").textContent = fmtCompte(s.resta); $("m-barra").style.width = (s.p * 100).toFixed(2) + "%"; const t = vol.turbulencies || []; $("m-turbs").textContent = t.length ? t.length + (t.length === 1 ? " turbulència" : " turbulències") + " en aquest vol" : "Vol tranquil fins ara"; }
+    return;
+  }
+  $("h-compte").textContent = fmtCompte(s.resta);
+  $("h-barra").style.width = (s.p * 100).toFixed(2) + "%"; $("h-avio").style.left = (s.p * 100).toFixed(2) + "%";
+  $("h-sobre").textContent = (sobrevol.nom || "—") + (sobrevol.prop ? " · prop de " + sobrevol.prop.nom : "");
+  $("h-alt").textContent = fmtKm(s.alt); $("h-vel").textContent = fmtKm(s.vel); $("h-eta").textContent = fmtHora(s.fi);
+  $("h-fase").textContent = s.fase;
+  document.title = fmtCompte(s.resta) + " · " + vol.desti + " · Altitud";
+  const av = $("v-mobil");
+  if (av) {
+    let st = "ok", tt, ss;
+    if (!vol.mobil) { st = ""; tt = "Sense mòbil a bord"; ss = "Aquest vol no té el mòbil enllaçat."; }
+    else if (!mobilPeer) { st = "fora"; tt = "El mòbil no respon"; ss = "Ha fet check-in, però ara no està connectat."; }
+    else if (mobilPeer.presence && mobilPeer.presence.visible === false) { st = "fora"; tt = "Mòbil fora de cabina"; ss = "Ara mateix el mòbil no és a Altitud."; }
+    else { tt = "Mòbil a bord"; ss = "Cap per avall i en silenci."; }
+    av.dataset.s = st; $("v-mobil-t").textContent = tt; $("v-mobil-s").textContent = ss;
+    const t = vol.turbulencies || [];
+    const ht = t.length ? '<span class="eyebrow">Turbulències</span><ul>' + t.slice(-5).map(x => '<li>' + fmtHora(x.at) + ' · ' + x.s + ' s fora</li>').join("") + '</ul>' : "";
+    if ($("v-turbs").dataset.k !== ht) { $("v-turbs").innerHTML = ht; $("v-turbs").dataset.k = ht; }
+  }
+  revisaAnuncis(s);
+}
+
+let ultimTick = 0, ultimDibuix = 0;
+function bucle(t) {
+  if (t - ultimTick > 250) { ultimTick = t; tick(); if (!esMobil) $("z-escala").textContent = textEscala(); }
+  if (!esMobil) {
+    const mou = mouCamera();
+    const envol = vol.estat === "en_vol";
+    if (mou || brut || arr || (envol && t - ultimDibuix > 33) || t - ultimDibuix > 20000) { dibuixaGlobus(t); ultimDibuix = t; brut = false; }
+    if (envol && finestraOn && !$("finestra").hidden) dibuixaFinestra(t);
+  }
+  requestAnimationFrame(bucle);
+}
+if (window.ResizeObserver) { new ResizeObserver(mida).observe(cv); new ResizeObserver(midaFinestra).observe(cf); }
+window.addEventListener("resize", () => { mida(); midaFinestra(); });
+
+mostraPestanya(["vol", "diari", "passaport"].indexOf(pestanya) >= 0 ? pestanya : "vol");
+mida(); renderTot();
+requestAnimationFrame(bucle);
+carregaMapa();
+iniciaStore();
+})();
+</script>
+
+<script>if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); }); }</script>
+</body>
+</html>
