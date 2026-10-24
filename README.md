@@ -4,7 +4,7 @@ Temporitzador de concentració en forma de vols. Tries quant de temps vols conce
 
 ## Què fa
 
-- Globus amb països reals, zona de nit en temps real i tres càmeres: **Pilot** (darrere l'avió, amb el nord girat segons el rumb), **Seguir** i **Ruta**.
+- Mapa WebGL (MapLibre) amb globus, països reals, zona de nit en temps real i tres càmeres: **Pilot** (3D, darrere de l'avió), **Seguir** i **Ruta**.
 - Plànol de seients amb Turista, Preferent (a les 5 h de vol) i Business (a les 20 h).
 - Finestreta animada segons l'hora del dia allà on és l'avió.
 - Avisos de cabina, objectiu per a cada vol, escales de 5 o 10 minuts.

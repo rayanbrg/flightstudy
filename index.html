@@ -14,217 +14,256 @@
 <title>Altitud</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <style>
-/* Concepte: torre de control nocturna. Globus real a pantalla completa, panells de vidre fumat a sobre; l'ambre dels instruments de cabina marca l'avió i la ruta. Tema fosc únic, triat a propòsit. */
+/* Concepte: «Cel». L'app canvia amb el sol, com el cel de la finestreta: de dia, carta clara de paper i mar blau pàl·lid; de nit, cabina fosca.
+   Targetes sòlides i nítides sobre un globus a pantalla completa; un sol accent, taronja de senyalització, per a l'avió, la ruta i l'acció principal. */
 :root {
+  --fons: #E9F0F7;
+  --fons-2: #D9E6F2;
+  --carta: #FFFFFF;
+  --carta-2: #F4F7FA;
+  --tinta: #0D1524;
+  --suau: #5B687B;
+  --apagat: #97A2B2;
+  --linia: #E3E8EF;
+  --linia-forta: #C9D2DD;
+  --accent: #FF5B1F;
+  --accent-tinta: #FFFFFF;
+  --accent-suau: rgba(255, 91, 31, .10);
+  --blau: #2F6BFF;
+  --ok: #10A169;
+  --alerta: #E07B00;
+  --perill: #E2384D;
+  --business: #A87A1C;
+  --preferent: #2F6BFF;
+  --ombra: 0 1px 2px rgba(13, 21, 36, .06), 0 14px 34px -14px rgba(13, 21, 36, .22);
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Geist", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "Geist Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  --r: 20px;
+  --panell-w: 392px;
+  color-scheme: light;
+}
+:root[data-cel="nit"] {
+  --fons: #060B14;
+  --fons-2: #0B1424;
+  --carta: #101A2B;
+  --carta-2: #152137;
+  --tinta: #E9EEF6;
+  --suau: #94A2B7;
+  --apagat: #5F6C82;
+  --linia: #1E2A3F;
+  --linia-forta: #2D3C56;
+  --accent: #FF6A33;
+  --accent-tinta: #1B0900;
+  --accent-suau: rgba(255, 106, 51, .14);
+  --blau: #7FA5FF;
+  --ok: #3FD08F;
+  --alerta: #FFB04D;
+  --perill: #FF6B7D;
+  --business: #E4C26C;
+  --preferent: #7FA5FF;
+  --ombra: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 18px 40px -18px rgba(0, 0, 0, .8);
   color-scheme: dark;
-  --nit: #050A14;
-  --mar: #0A1830;
-  --terra: #16263D;
-  --terra-viva: #24405F;
-  --frontera: rgba(140, 175, 220, .22);
-  --grat: rgba(140, 175, 220, .07);
-  --vidre: rgba(9, 17, 31, .78);
-  --vidre-fort: rgba(12, 22, 40, .94);
-  --vora: rgba(150, 185, 230, .14);
-  --vora-forta: rgba(150, 185, 230, .28);
-  --text: #E9EFF8;
-  --suau: #8D9DB6;
-  --apagat: #56657D;
-  --ambre: #FFB547;
-  --ambre-fosc: #2A1D05;
-  --cel: #74C8FF;
-  --ok: #4FD49A;
-  --alerta: #FF9F5A;
-  --perill: #FF6278;
-  --business: #E7C873;
-  --preferent: #74C8FF;
-  --f-display: "Unbounded", "Segoe UI", system-ui, sans-serif;
-  --f-body: "Manrope", "Segoe UI", system-ui, sans-serif;
-  --f-mono: "JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
-  --r: 16px;
-  --panell-w: 404px;
 }
 [hidden] { display: none !important; }
 html, body { min-height: 100%; }
-body { background: var(--nit); color: var(--text); font-family: var(--f-body); font-size: 14.5px; line-height: 1.5; margin: 0; }
+body { background: var(--fons); color: var(--tinta); font-family: var(--f-body); font-size: 14.5px; line-height: 1.5; margin: 0; transition: background-color .6s; }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
-:focus-visible { outline: 2px solid var(--ambre); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
-.eyebrow { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--suau); }
-h2, h3 { font-family: var(--f-display); font-weight: 700; margin: 0; letter-spacing: -.01em; text-wrap: balance; line-height: 1.1; }
-h2 { font-size: 22px; } h3 { font-size: 15px; }
-.vidre { background: var(--vidre); border: 1px solid var(--vora); border-radius: var(--r); backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }
+.eyebrow { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--suau); }
+h2, h3 { font-family: var(--f-display); font-weight: 700; margin: 0; letter-spacing: -.02em; text-wrap: balance; line-height: 1.05; }
+h2 { font-size: 24px; } h3 { font-size: 16px; }
+.vidre { background: var(--carta); border: 1px solid var(--linia); border-radius: var(--r); box-shadow: var(--ombra); }
 
-/* Escena del globus */
-.escena { position: fixed; inset: 0; overflow: hidden; }
-#globus { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
-#globus:active { cursor: grabbing; }
+/* MapLibre (regles mínimes) */
+.maplibregl-map { overflow: hidden; position: relative; -webkit-tap-highlight-color: transparent; }
+.maplibregl-canvas { left: 0; position: absolute; top: 0; }
+.maplibregl-canvas-container.maplibregl-interactive { cursor: grab; }
+.maplibregl-canvas-container.maplibregl-interactive:active { cursor: grabbing; }
+.maplibregl-canvas-container.maplibregl-touch-zoom-rotate, .maplibregl-canvas-container.maplibregl-touch-zoom-rotate .maplibregl-canvas { touch-action: pan-x pan-y; }
+.maplibregl-canvas-container.maplibregl-touch-drag-pan, .maplibregl-canvas-container.maplibregl-touch-drag-pan .maplibregl-canvas { touch-action: pinch-zoom; }
+.maplibregl-canvas-container.maplibregl-touch-zoom-rotate.maplibregl-touch-drag-pan, .maplibregl-canvas-container.maplibregl-touch-zoom-rotate.maplibregl-touch-drag-pan .maplibregl-canvas { touch-action: none; }
+.maplibregl-marker { left: 0; position: absolute; top: 0; will-change: transform; }
+
+/* Escena */
+.escena { position: fixed; inset: 0; overflow: hidden; background: radial-gradient(120% 90% at 65% 40%, var(--fons-2), var(--fons) 70%); }
+#mapa { position: absolute; inset: 0; }
+#etiquetes { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.sense-mapa { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: var(--suau); margin: 0; }
+.avio-marcador { width: 44px; height: 44px; display: grid; place-items: center; pointer-events: none; }
+.avio-marcador::before { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; animation: pols 2.2s ease-out infinite; }
+.avio-marcador svg { width: 38px; height: 38px; color: var(--accent); filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .35)); position: relative; }
+@keyframes pols { 0% { transform: scale(.6); opacity: .6; } 100% { transform: scale(2.2); opacity: 0; } }
 
 .dalt {
   position: absolute; top: 0; left: 0; right: 0; z-index: 3; pointer-events: none;
-  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px;
   padding-block: 14px 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 .dalt > * { pointer-events: auto; }
-.marca { font-family: var(--f-display); font-weight: 700; font-size: 20px; letter-spacing: .02em; display: flex; align-items: center; gap: 10px; margin-right: auto; }
-.marca svg { width: 26px; height: 26px; color: var(--ambre); }
-.posicio { font-size: 13px; color: var(--suau); padding: 7px 12px; border-radius: 999px; }
-.posicio b { font-family: var(--f-mono); color: var(--text); font-weight: 500; margin-inline: 4px; }
+.marca { font-family: var(--f-display); font-weight: 800; font-size: 24px; letter-spacing: -.03em; display: flex; align-items: center; gap: 9px; margin-right: auto; padding: 6px 16px 6px 10px; border-radius: 999px; background: var(--carta); box-shadow: var(--ombra); border: 1px solid var(--linia); }
+.marca svg { width: 24px; height: 24px; color: var(--accent); }
+.posicio { font-size: 13px; color: var(--suau); padding: 8px 14px; border-radius: 999px; }
+.posicio b { font-family: var(--f-mono); color: var(--tinta); font-weight: 500; margin-inline: 4px; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.segment { display: inline-flex; padding: 3px; border-radius: 999px; gap: 2px; }
-.segment button, .boto-pill { border: 0; background: transparent; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--suau); }
-.segment button[aria-pressed="true"] { background: var(--text); color: var(--nit); }
-.boto-pill { border: 1px solid var(--vora); background: var(--vidre); color: var(--text); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
-.boto-pill[aria-pressed="true"] { border-color: var(--ambre); color: var(--ambre); }
-.boto-pill:disabled { opacity: .4; cursor: not-allowed; }
-.zoom { position: absolute; z-index: 3; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 16px; display: grid; gap: 2px; padding: 4px; border-radius: 14px; }
-.zoom button { width: 38px; height: 38px; border: 0; background: transparent; border-radius: 10px; font-size: 20px; font-weight: 600; line-height: 1; }
-.zoom button:hover { background: rgba(255, 255, 255, .08); }
-.zoom span { font-family: var(--f-mono); font-size: 10px; color: var(--suau); text-align: center; padding-block: 2px; }
-.escena.volant .zoom { bottom: 150px; }
-.so { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 12px; border-radius: 999px; }
+.segment { display: inline-flex; padding: 4px; border-radius: 999px; gap: 2px; }
+.segment button, .boto-pill { border: 0; background: transparent; border-radius: 999px; padding: 7px 13px; font-size: 13px; font-weight: 600; color: var(--suau); }
+.segment button:hover { color: var(--tinta); }
+.segment button[aria-pressed="true"] { background: var(--tinta); color: var(--carta); }
+.boto-pill { border: 1px solid var(--linia); background: var(--carta); color: var(--tinta); box-shadow: var(--ombra); }
+.boto-pill[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.boto-pill:disabled { opacity: .45; cursor: not-allowed; }
+.so { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 14px; border-radius: 999px; }
 .so select { background: transparent; border: 0; padding: 4px 6px; font-size: 13px; font-weight: 600; }
-.so select option { background: var(--vidre-fort); }
-.xip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px 7px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+.so select option { background: var(--carta); color: var(--tinta); }
+.xip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px 8px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; }
 .xip i { width: 8px; height: 8px; border-radius: 50%; background: var(--apagat); flex: none; }
-.xip[data-s="ok"] i { background: var(--ok); box-shadow: 0 0 0 3px rgba(79, 212, 154, .2); }
+.xip[data-s="ok"] i { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
 .xip[data-s="fora"] i { background: var(--perill); animation: batec 1s infinite; }
 @keyframes batec { 50% { opacity: .25; } }
+.zoom { position: absolute; z-index: 3; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 16px; display: grid; gap: 2px; padding: 4px; border-radius: 16px; }
+.zoom button { width: 38px; height: 38px; border: 0; background: transparent; border-radius: 12px; font-size: 20px; font-weight: 500; line-height: 1; }
+.zoom button:hover { background: var(--carta-2); }
+.zoom span { font-family: var(--f-mono); font-size: 10px; color: var(--suau); text-align: center; padding-block: 2px; }
+.escena.volant .zoom { bottom: 152px; }
 
 /* Panell lateral */
-.panell-wrap { position: fixed; z-index: 4; left: max(16px, env(safe-area-inset-left, 0px)); top: 70px; bottom: 16px; width: var(--panell-w); display: flex; }
-.panell { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-.pestanyes { display: flex; gap: 4px; padding: 6px; border-bottom: 1px solid var(--vora); }
+.panell-wrap { position: fixed; z-index: 4; left: max(16px, env(safe-area-inset-left, 0px)); top: 76px; bottom: 16px; width: var(--panell-w); display: flex; }
+.panell { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+.pestanyes { display: flex; gap: 2px; margin: 10px 10px 0; padding: 4px; border-radius: 14px; background: var(--carta-2); }
 .pestanyes button { flex: 1; border: 0; background: transparent; border-radius: 10px; padding: 8px 6px; font-weight: 600; font-size: 13.5px; color: var(--suau); }
-.pestanyes button[aria-selected="true"] { background: rgba(255, 255, 255, .07); color: var(--text); }
-.pestanya { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 18px; min-height: 0; }
-.pestanya::-webkit-scrollbar { width: 8px; } .pestanya::-webkit-scrollbar-thumb { background: var(--vora); border-radius: 4px; }
+.pestanyes button[aria-selected="true"] { background: var(--carta); color: var(--tinta); box-shadow: 0 1px 3px rgba(13, 21, 36, .12); }
+.pestanya { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 20px; min-height: 0; }
+.pestanya::-webkit-scrollbar { width: 8px; } .pestanya::-webkit-scrollbar-thumb { background: var(--linia); border-radius: 4px; }
 .bloc { display: flex; flex-direction: column; gap: 10px; }
 .bloc-cap { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 8px; }
 
 .xips { display: flex; flex-wrap: wrap; gap: 6px; }
-.xips button { border: 1px solid var(--vora); background: transparent; border-radius: 10px; padding: 6px 11px; font-size: 13.5px; font-weight: 600; color: var(--suau); }
-.xips button:hover { border-color: var(--vora-forta); color: var(--text); }
-.xips button[aria-pressed="true"] { background: var(--ambre); border-color: var(--ambre); color: var(--ambre-fosc); }
-.xips.mono button { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-weight: 500; }
-.durada-gran { font-family: var(--f-display); font-weight: 700; font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; }
-.durada-gran small { font-family: var(--f-mono); font-size: 12px; font-weight: 400; color: var(--suau); margin-left: 4px; }
-input[type=range] { width: 100%; accent-color: var(--ambre); }
+.xips button { border: 1px solid var(--linia); background: var(--carta); border-radius: 999px; padding: 6px 12px; font-size: 13.5px; font-weight: 500; color: var(--tinta); }
+.xips button:hover { border-color: var(--linia-forta); }
+.xips button[aria-pressed="true"] { background: var(--tinta); border-color: var(--tinta); color: var(--carta); }
+.xips.mono button { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.durada-gran { font-family: var(--f-display); font-weight: 800; font-size: 40px; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.durada-gran small { font-family: var(--f-mono); font-size: 12px; font-weight: 400; color: var(--suau); margin-left: 4px; letter-spacing: 0; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
 
 .destins { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.desti { text-align: left; border: 1px solid var(--vora); background: rgba(255, 255, 255, .02); border-radius: 12px; padding: 9px 10px; display: grid; gap: 1px; min-width: 0; }
-.desti:hover { border-color: var(--vora-forta); }
-.desti b { font-family: var(--f-display); font-weight: 700; font-size: 19px; letter-spacing: .02em; line-height: 1.15; }
-.desti span { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.desti { text-align: left; border: 1px solid var(--linia); background: var(--carta); border-radius: 14px; padding: 10px 11px; display: grid; gap: 1px; min-width: 0; }
+.desti:hover { border-color: var(--linia-forta); }
+.desti b { font-family: var(--f-display); font-weight: 800; font-size: 22px; letter-spacing: -.01em; line-height: 1.1; }
+.desti span { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .desti em { font-style: normal; font-family: var(--f-mono); font-size: 10.5px; color: var(--suau); }
-.desti[aria-pressed="true"] { border-color: var(--ambre); background: rgba(255, 181, 71, .1); }
-.desti[aria-pressed="true"] b { color: var(--ambre); }
+.desti[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-suau); box-shadow: inset 0 0 0 1px var(--accent); }
+.desti[aria-pressed="true"] b { color: var(--accent); }
 
-.seient-fila { display: flex; align-items: center; gap: 12px; border: 1px solid var(--vora); border-radius: 12px; padding: 10px 12px; }
-.seient-codi { font-family: var(--f-display); font-weight: 700; font-size: 26px; line-height: 1; min-width: 56px; }
+.seient-fila { display: flex; align-items: center; gap: 12px; border: 1px solid var(--linia); border-radius: 14px; padding: 10px 12px; background: var(--carta-2); }
+.seient-codi { font-family: var(--f-display); font-weight: 800; font-size: 28px; line-height: 1; min-width: 58px; letter-spacing: -.02em; }
 .seient-info { flex: 1; display: grid; font-size: 13px; min-width: 0; }
 .seient-info span:last-child { color: var(--suau); }
 .classe-tag { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; }
 .classe-tag[data-c="Business"] { color: var(--business); } .classe-tag[data-c="Preferent"] { color: var(--preferent); } .classe-tag[data-c="Turista"] { color: var(--suau); }
 
-input[type=text] { width: 100%; box-sizing: border-box; background: rgba(255, 255, 255, .04); border: 1px solid var(--vora); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+input[type=text] { width: 100%; box-sizing: border-box; background: var(--carta-2); border: 1px solid var(--linia); border-radius: 12px; padding: 11px 13px; font-size: 14px; }
+input[type=text]:focus { border-color: var(--linia-forta); outline: none; box-shadow: 0 0 0 3px var(--accent-suau); }
 input[type=text]::placeholder { color: var(--apagat); }
 
-.primari { border: 0; background: var(--ambre); color: var(--ambre-fosc); border-radius: 12px; padding: 13px 16px; font-family: var(--f-display); font-weight: 700; font-size: 14px; letter-spacing: .04em; }
-.primari:hover { filter: brightness(1.07); }
+.primari { border: 0; background: var(--accent); color: var(--accent-tinta); border-radius: 14px; padding: 14px 16px; font-weight: 600; font-size: 15px; box-shadow: 0 8px 20px -10px var(--accent); }
+.primari:hover { filter: brightness(1.05); }
 .primari:disabled { opacity: .45; cursor: not-allowed; }
-.secundari { border: 1px solid var(--vora-forta); background: transparent; border-radius: 12px; padding: 10px 14px; font-weight: 600; font-size: 13.5px; }
-.secundari:hover { border-color: var(--text); }
-.perill { color: var(--perill); border-color: rgba(255, 98, 120, .35); }
+.secundari { border: 1px solid var(--linia-forta); background: var(--carta); border-radius: 12px; padding: 10px 14px; font-weight: 600; font-size: 13.5px; }
+.secundari:hover { border-color: var(--tinta); }
+.perill { color: var(--perill); border-color: color-mix(in srgb, var(--perill) 40%, transparent); }
 .fila-botons { display: flex; flex-wrap: wrap; gap: 8px; }
 .fila-botons > * { flex: 1 1 auto; }
-details.ajuda { border-top: 1px solid var(--vora); padding-top: 14px; font-size: 13px; color: var(--suau); }
-details.ajuda summary { cursor: pointer; font-weight: 600; color: var(--text); }
+details.ajuda { border-top: 1px solid var(--linia); padding-top: 14px; font-size: 13px; color: var(--suau); }
+details.ajuda summary { cursor: pointer; font-weight: 600; color: var(--tinta); }
 details.ajuda ol { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 4px; }
-details.ajuda b { color: var(--text); }
+details.ajuda b { color: var(--tinta); }
 
 /* Targeta d'embarcament */
-.targeta { border-radius: 14px; overflow: hidden; background: linear-gradient(160deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .02)); border: 1px solid var(--vora); }
-.targeta-cap { display: flex; justify-content: space-between; padding: 10px 16px; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .14em; background: rgba(255, 255, 255, .05); }
-.targeta[data-c="Business"] .targeta-cap { background: var(--business); color: #2B220A; }
-.targeta[data-c="Preferent"] .targeta-cap { background: var(--preferent); color: #062033; }
+.targeta { border-radius: 16px; overflow: hidden; background: var(--carta); border: 1px solid var(--linia); box-shadow: var(--ombra); }
+.targeta-cap { display: flex; justify-content: space-between; padding: 10px 16px; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .14em; background: var(--tinta); color: var(--carta); }
+.targeta[data-c="Business"] .targeta-cap { background: var(--business); color: #FFFFFF; }
+.targeta[data-c="Preferent"] .targeta-cap { background: var(--preferent); color: #FFFFFF; }
 .ruta { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 8px; padding: 16px 16px 6px; }
-.ruta .codi { font-family: var(--f-display); font-weight: 700; font-size: 40px; line-height: .95; letter-spacing: .01em; }
-.ruta .dreta { text-align: right; } .ruta .dreta .codi { color: var(--ambre); }
+.ruta .codi { font-family: var(--f-display); font-weight: 800; font-size: 46px; line-height: .9; letter-spacing: -.03em; }
+.ruta .dreta { text-align: right; } .ruta .dreta .codi { color: var(--accent); }
 .ruta .ciutat { font-size: 12.5px; color: var(--suau); }
-.ruta svg { width: 50px; height: 22px; margin-bottom: 18px; color: var(--suau); }
+.ruta svg { width: 50px; height: 22px; margin-bottom: 18px; color: var(--apagat); }
 .camps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 10px 16px 14px; }
 .camps div { display: grid; gap: 1px; min-width: 0; }
 .camps b { font-family: var(--f-mono); font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.perfora { border-top: 1.5px dashed var(--vora-forta); margin-inline: 10px; }
+.perfora { border-top: 1.5px dashed var(--linia-forta); margin-inline: 10px; }
 .matriu { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; }
-.codi-barres { height: 26px; flex: 1; max-width: 170px; opacity: .75; background: repeating-linear-gradient(90deg, var(--text) 0 2px, transparent 2px 4px, var(--text) 4px 5px, transparent 5px 8px, var(--text) 8px 11px, transparent 11px 12px); }
+.codi-barres { height: 26px; flex: 1; max-width: 170px; opacity: .85; background: repeating-linear-gradient(90deg, var(--tinta) 0 2px, transparent 2px 4px, var(--tinta) 4px 5px, transparent 5px 8px, var(--tinta) 8px 11px, transparent 11px 12px); }
 .objectiu-linia { padding: 0 16px 12px; font-size: 13px; color: var(--suau); }
-.objectiu-linia b { color: var(--text); font-weight: 600; }
+.objectiu-linia b { color: var(--tinta); font-weight: 600; }
 
-.avis { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: rgba(255, 181, 71, .1); font-size: 13.5px; }
+.avis { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: var(--accent-suau); font-size: 13.5px; }
 .avis b { display: block; }
-.avis .punt { width: 9px; height: 9px; border-radius: 50%; background: var(--ambre); margin-top: 6px; flex: none; animation: batec 1.2s infinite; }
-.avis[data-s="ok"] { background: rgba(79, 212, 154, .1); } .avis[data-s="ok"] .punt { background: var(--ok); animation: none; }
-.avis[data-s="fora"] { background: rgba(255, 98, 120, .12); } .avis[data-s="fora"] .punt { background: var(--perill); }
+.avis .punt { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); margin-top: 6px; flex: none; animation: batec 1.2s infinite; }
+.avis[data-s="ok"] { background: color-mix(in srgb, var(--ok) 12%, transparent); } .avis[data-s="ok"] .punt { background: var(--ok); animation: none; }
+.avis[data-s="fora"] { background: color-mix(in srgb, var(--perill) 12%, transparent); } .avis[data-s="fora"] .punt { background: var(--perill); }
 
-/* Vol en curs (panell) */
-.llista-dades { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--vora); border: 1px solid var(--vora); border-radius: 12px; overflow: hidden; }
-.llista-dades div { background: var(--vidre-fort); padding: 10px 12px; display: grid; gap: 1px; min-width: 0; }
+.llista-dades { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--linia); border: 1px solid var(--linia); border-radius: 14px; overflow: hidden; }
+.llista-dades div { background: var(--carta); padding: 10px 12px; display: grid; gap: 1px; min-width: 0; }
 .llista-dades b { font-family: var(--f-mono); font-weight: 500; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .turbs ul { margin: 6px 0 0; padding-left: 18px; font-family: var(--f-mono); font-size: 12px; color: var(--alerta); }
 
 /* HUD inferior */
-.hud { position: absolute; z-index: 3; left: calc(var(--panell-w) + 32px); right: max(16px, env(safe-area-inset-right, 0px)); bottom: 16px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 26px; align-items: center; padding: 16px 22px; }
-.hud-compte { font-family: var(--f-display); font-weight: 700; font-size: 52px; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.hud { position: absolute; z-index: 3; left: calc(var(--panell-w) + 32px); right: max(16px, env(safe-area-inset-right, 0px)); bottom: 16px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 28px; align-items: center; padding: 16px 24px; }
+.hud-compte { font-family: var(--f-body); font-weight: 600; font-size: 56px; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
 .hud-mig { display: grid; gap: 10px; min-width: 0; }
-.hud-ruta { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; font-family: var(--f-mono); font-weight: 500; }
-.hud-barra { position: relative; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .1); }
-.hud-barra i { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: linear-gradient(90deg, rgba(255, 181, 71, .3), var(--ambre)); }
-.hud-barra svg { position: absolute; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); color: var(--ambre); filter: drop-shadow(0 0 6px rgba(255, 181, 71, .6)); }
+.hud-ruta { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; font-family: var(--f-display); font-weight: 800; font-size: 17px; }
+.hud-barra { position: relative; height: 4px; border-radius: 2px; background: var(--linia); }
+.hud-barra i { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: var(--accent); }
+.hud-barra svg { position: absolute; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); color: var(--accent); }
 .hud-dades { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--suau); }
-.hud-dades b { color: var(--text); font-weight: 600; }
+.hud-dades b { color: var(--tinta); font-weight: 600; }
 .hud-dades .mono b { font-weight: 500; }
 .hud-dreta { display: grid; gap: 6px; justify-items: end; max-width: 240px; text-align: right; }
-.fase { font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--ambre); color: var(--ambre); }
+.fase { font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; padding: 5px 11px; border-radius: 999px; background: var(--accent-suau); color: var(--accent); }
 .hud-obj { font-size: 13px; color: var(--suau); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
 /* Finestreta */
-.finestra { position: absolute; z-index: 3; right: max(16px, env(safe-area-inset-right, 0px)); top: 120px; width: 212px; display: grid; gap: 8px; justify-items: center; }
-.marc { width: 212px; height: 290px; border-radius: 46% / 36%; padding: 12px; box-sizing: border-box; background: linear-gradient(145deg, #2A3343, #151B26); box-shadow: 0 20px 50px -20px rgba(0, 0, 0, .9), inset 0 1px 0 rgba(255, 255, 255, .08); }
-.marc canvas { width: 100%; height: 100%; display: block; border-radius: 44% / 34%; box-shadow: inset 0 0 22px rgba(0, 0, 0, .6); }
-.finestra-peu { font-family: var(--f-mono); font-size: 11px; color: var(--suau); padding: 4px 10px; border-radius: 999px; }
+.finestra { position: absolute; z-index: 3; right: max(16px, env(safe-area-inset-right, 0px)); top: 128px; width: 212px; display: grid; gap: 8px; justify-items: center; }
+.marc { width: 212px; height: 290px; border-radius: 46% / 36%; padding: 12px; box-sizing: border-box; background: linear-gradient(145deg, #F3F5F8, #C9D0DA); box-shadow: 0 22px 50px -20px rgba(13, 21, 36, .55), inset 0 1px 0 rgba(255, 255, 255, .8); }
+:root[data-cel="nit"] .marc { background: linear-gradient(145deg, #2A3343, #151B26); box-shadow: 0 20px 50px -20px rgba(0, 0, 0, .9), inset 0 1px 0 rgba(255, 255, 255, .08); }
+.marc canvas { width: 100%; height: 100%; display: block; border-radius: 44% / 34%; box-shadow: inset 0 0 22px rgba(0, 0, 0, .45); }
+.finestra-peu { font-family: var(--f-mono); font-size: 11px; color: var(--suau); padding: 5px 11px; border-radius: 999px; }
 
 /* Avisos de cabina */
-.toast { position: absolute; z-index: 5; top: 70px; left: calc((100% + var(--panell-w) + 16px) / 2); transform: translateX(-50%); max-width: min(560px, calc(100% - var(--panell-w) - 64px)); display: flex; gap: 12px; align-items: center; padding: 12px 18px; font-size: 14px; animation: entra .4s ease-out; }
-.toast svg { width: 20px; height: 20px; color: var(--ambre); flex: none; }
+.toast { position: absolute; z-index: 5; top: 76px; left: calc((100% + var(--panell-w) + 16px) / 2); transform: translateX(-50%); max-width: min(560px, calc(100% - var(--panell-w) - 64px)); display: flex; gap: 12px; align-items: center; padding: 12px 18px; font-size: 14px; animation: entra .4s ease-out; }
+.toast svg { width: 20px; height: 20px; color: var(--accent); flex: none; }
 @keyframes entra { from { opacity: 0; transform: translate(-50%, -8px); } }
 
 /* Diari */
 .totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; }
 .totals div { display: grid; }
-.totals b { font-family: var(--f-display); font-weight: 700; font-size: 30px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.totals b { font-family: var(--f-display); font-weight: 800; font-size: 34px; line-height: 1.05; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
 .grafic svg { width: 100%; height: auto; display: block; }
-.grafic .barra { fill: var(--ambre); } .grafic .barra.buida { fill: rgba(255, 255, 255, .08); }
+.grafic .barra { fill: var(--accent); } .grafic .barra.buida { fill: var(--linia); }
 .grafic text { fill: var(--suau); font-family: var(--f-mono); font-size: 10px; }
-.grafic .valor { fill: var(--text); }
+.grafic .valor { fill: var(--tinta); }
 .motius-barres { display: grid; gap: 8px; }
 .motiu-barra { display: grid; grid-template-columns: 76px 1fr auto; gap: 10px; align-items: center; font-size: 13px; }
 .motiu-barra span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.motiu-barra div { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .07); overflow: hidden; }
-.motiu-barra i { display: block; height: 100%; background: var(--cel); border-radius: 3px; }
-.vols-llista { display: grid; gap: 0; border: 1px solid var(--vora); border-radius: 12px; overflow: hidden; }
-.vol-fila { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--vora); font-size: 13px; }
+.motiu-barra div { height: 6px; border-radius: 3px; background: var(--linia); overflow: hidden; }
+.motiu-barra i { display: block; height: 100%; background: var(--blau); border-radius: 3px; }
+.vols-llista { display: grid; border: 1px solid var(--linia); border-radius: 14px; overflow: hidden; }
+.vol-fila { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--linia); font-size: 13px; }
 .vol-fila:last-child { border-bottom: 0; }
 .vol-fila .data { font-family: var(--f-mono); font-size: 11.5px; color: var(--suau); }
 .vol-fila .rt { font-family: var(--f-mono); font-weight: 500; }
 .vol-fila .sub { color: var(--suau); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.etiq { font-family: var(--f-mono); font-size: 10.5px; padding: 2px 7px; border-radius: 6px; border: 1px solid currentColor; white-space: nowrap; }
+.etiq { font-family: var(--f-mono); font-size: 10.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
 .etiq.net { color: var(--ok); } .etiq.turb { color: var(--alerta); } .etiq.emerg { color: var(--perill); }
 .buit { color: var(--suau); font-size: 13.5px; margin: 0; }
 
@@ -232,65 +271,67 @@ details.ajuda b { color: var(--text); }
 .segells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .segell { aspect-ratio: 1; max-width: 100%; border-radius: 50%; border: 2px solid currentColor; display: grid; place-content: center; text-align: center; position: relative; padding: 6px; }
 .segell::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; border: 1px dashed currentColor; opacity: .6; }
-.segell b { font-family: var(--f-display); font-weight: 700; font-size: 18px; line-height: 1; }
+.segell b { font-family: var(--f-display); font-weight: 800; font-size: 19px; line-height: 1; }
 .segell span { font-size: 10px; line-height: 1.2; }
 .segell em { font-style: normal; font-family: var(--f-mono); font-size: 9px; opacity: .8; }
-.segell.c0 { color: var(--ambre); } .segell.c1 { color: var(--cel); } .segell.c2 { color: var(--ok); } .segell.c3 { color: #F08BD0; }
+.segell.c0 { color: var(--accent); } .segell.c1 { color: var(--blau); } .segell.c2 { color: var(--ok); } .segell.c3 { color: #B14FC5; }
 .segell.buit { color: var(--apagat); border-style: dashed; }
 .segell.buit::after { display: none; }
 .insignies { display: grid; gap: 8px; }
-.insignia { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--vora); border-radius: 12px; }
-.insignia .ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: rgba(255, 255, 255, .05); color: var(--apagat); }
-.insignia.feta .ic { background: rgba(255, 181, 71, .14); color: var(--ambre); }
+.insignia { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--linia); border-radius: 14px; }
+.insignia .ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--carta-2); color: var(--apagat); }
+.insignia.feta .ic { background: var(--accent-suau); color: var(--accent); }
 .insignia .ic svg { width: 20px; height: 20px; }
 .insignia b { font-size: 13.5px; } .insignia p { margin: 0; font-size: 12px; color: var(--suau); }
-.insignia .prog { height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .08); margin-top: 6px; overflow: hidden; }
-.insignia .prog i { display: block; height: 100%; background: var(--ambre); }
+.insignia .prog { height: 3px; border-radius: 2px; background: var(--linia); margin-top: 6px; overflow: hidden; }
+.insignia .prog i { display: block; height: 100%; background: var(--accent); }
 
 /* Resum d'aterratge */
-.estampa { display: inline-block; transform: rotate(-4deg); border: 2px solid var(--ok); color: var(--ok); border-radius: 8px; padding: 4px 12px; font-family: var(--f-display); font-weight: 700; font-size: 16px; letter-spacing: .06em; text-transform: uppercase; }
+.estampa { display: inline-block; transform: rotate(-4deg); border: 2px solid var(--ok); color: var(--ok); border-radius: 8px; padding: 4px 12px; font-family: var(--f-display); font-weight: 800; font-size: 17px; letter-spacing: .02em; text-transform: uppercase; }
 .estampa[data-s="turb"] { border-color: var(--alerta); color: var(--alerta); }
 .estampa[data-s="emerg"] { border-color: var(--perill); color: var(--perill); }
 .xifres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .xifres div { display: grid; }
-.xifres b { font-family: var(--f-display); font-weight: 700; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.escala-compte { font-family: var(--f-display); font-weight: 700; font-size: 64px; line-height: 1; font-variant-numeric: tabular-nums; }
+.xifres b { font-family: var(--f-display); font-weight: 800; font-size: 28px; line-height: 1.1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.escala-compte { font-family: var(--f-body); font-weight: 600; font-size: 64px; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
 
 /* Diàlegs */
-.velo { position: fixed; inset: 0; z-index: 20; background: rgba(2, 5, 12, .62); display: grid; place-items: center; padding: 16px; }
-.dialeg { background: #0C1628; border: 1px solid var(--vora); border-radius: var(--r); padding: 22px; max-width: 400px; width: 100%; box-sizing: border-box; display: grid; gap: 14px; box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .9); min-width: 0; }
+.velo { position: fixed; inset: 0; z-index: 20; background: rgba(8, 14, 26, .45); display: grid; place-items: center; padding: 16px; }
+.dialeg { background: var(--carta); border: 1px solid var(--linia); border-radius: var(--r); padding: 22px; max-width: 400px; width: 100%; box-sizing: border-box; display: grid; gap: 14px; box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .6); min-width: 0; }
 .dialeg p { margin: 0; color: var(--suau); }
 .dialeg.ample { max-width: 960px; }
 .llegenda { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--suau); }
 .llegenda span { display: inline-flex; align-items: center; gap: 6px; }
 .llegenda i { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid; display: inline-block; }
 .fuselatge-wrap { overflow-x: auto; padding-bottom: 8px; min-width: 0; }
-.fuselatge { display: flex; align-items: center; gap: 4px; padding: 18px 26px 18px 70px; width: max-content; border-radius: 120px 40px 40px 120px; background: rgba(255, 255, 255, .03); border: 1px solid var(--vora); }
+.fuselatge { display: flex; align-items: center; gap: 4px; padding: 18px 26px 18px 70px; width: max-content; border-radius: 120px 40px 40px 120px; background: var(--carta-2); border: 1px solid var(--linia); }
 .fila { display: grid; grid-template-rows: repeat(3, 26px) 18px repeat(3, 26px); gap: 4px; justify-items: center; }
 .fila.ample-f { grid-template-rows: 40px 26px 18px 26px 40px; }
 .fila .num { font-family: var(--f-mono); font-size: 10px; color: var(--apagat); align-self: center; }
 .fila.sortida .num { color: var(--perill); }
-.st { width: 26px; height: 26px; border-radius: 6px 6px 4px 4px; border: 1.5px solid var(--vora-forta); background: transparent; padding: 0; font-family: var(--f-mono); font-size: 9.5px; color: var(--suau); }
+.st { width: 26px; height: 26px; border-radius: 7px 7px 4px 4px; border: 1.5px solid var(--linia-forta); background: var(--carta); padding: 0; font-family: var(--f-mono); font-size: 9.5px; color: var(--suau); }
 .fila.ample-f .st { width: 34px; height: 40px; }
 .st[data-c="Business"] { border-color: var(--business); color: var(--business); }
 .st[data-c="Preferent"] { border-color: var(--preferent); color: var(--preferent); }
-.st:hover:not(:disabled) { background: rgba(255, 255, 255, .1); }
-.st.ocupat { background: rgba(255, 255, 255, .06); border-color: transparent; color: transparent; cursor: not-allowed; }
+.st:hover:not(:disabled) { background: var(--accent-suau); }
+.st.ocupat { background: var(--linia); border-color: transparent; color: transparent; cursor: not-allowed; }
 .st.bloc { opacity: .3; cursor: not-allowed; }
-.st[aria-pressed="true"] { background: var(--ambre); border-color: var(--ambre); color: var(--ambre-fosc); font-weight: 700; }
-.separador { width: 1px; align-self: stretch; background: var(--vora); margin-inline: 8px; }
+.st[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-tinta); font-weight: 700; }
+.separador { width: 1px; align-self: stretch; background: var(--linia); margin-inline: 8px; }
 
 /* Mode mòbil */
 .mobil { min-height: 100vh; min-height: 100dvh; box-sizing: border-box; display: flex; flex-direction: column; gap: 22px; padding-block: 22px 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 520px; margin-inline: auto; }
 .mobil-cap { display: flex; justify-content: space-between; align-items: center; }
+.mobil-cap .marca { box-shadow: none; }
 .mobil-centre { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 18px; text-align: center; }
 .mobil-centre p { margin: 0; color: var(--suau); }
-.mobil .compte { font-family: var(--f-display); font-weight: 700; font-size: clamp(64px, 22vw, 120px); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
-.mobil .ruta-linia { font-family: var(--f-display); font-weight: 700; font-size: 26px; }
-.mobil .ruta-linia em { font-style: normal; color: var(--ambre); }
-.mobil .barra-m { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .1); position: relative; }
-.mobil .barra-m i { position: absolute; inset: 0 auto 0 0; background: var(--ambre); border-radius: 2px; }
-.mobil.en-vol { --text: #9AA7BA; --suau: #56657D; }
+.mobil .compte { font-family: var(--f-body); font-weight: 600; font-size: clamp(64px, 22vw, 120px); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.05em; }
+.mobil .ruta-linia { font-family: var(--f-display); font-weight: 800; font-size: 28px; letter-spacing: -.02em; }
+.mobil .ruta-linia em { font-style: normal; color: var(--accent); }
+.mobil .barra-m { height: 4px; border-radius: 2px; background: var(--linia); position: relative; }
+.mobil .barra-m i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 2px; }
+body.en-vol-mobil { background: #04070D; }
+.mobil.en-vol { --tinta: #9AA7BA; --suau: #56657D; --linia: #1A2333; --carta: #0B111C; --carta-2: #0E1522; --linia-forta: #263247; color: var(--tinta); }
 .icona-gira { width: 60px; height: 60px; margin-inline: auto; color: var(--suau); }
 .canvi-mode { background: none; border: 0; color: var(--suau); text-decoration: underline; font-size: 13px; padding: 4px; }
 
@@ -300,19 +341,19 @@ details.ajuda b { color: var(--text); }
   .panell-wrap { position: static; width: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px 24px; }
   .pestanya { overflow: visible; }
   .hud { left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); bottom: 10px; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; padding: 12px 14px; }
-  .hud-compte { font-size: 34px; }
+  .hud-compte { font-size: 36px; }
   .hud-dreta { display: none; }
   .finestra { top: auto; bottom: 150px; width: 104px; }
   .escena.volant .zoom { bottom: 140px; }
   .zoom { right: auto; left: max(10px, env(safe-area-inset-left, 0px)); }
   .marc { width: 104px; height: 142px; padding: 6px; }
   .finestra-peu { display: none; }
-  .toast { left: 50%; max-width: calc(100% - 32px); top: 108px; }
+  .toast { left: 50%; max-width: calc(100% - 32px); top: 112px; }
 }
 @media (max-width: 460px) {
   .destins { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .camps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .ruta .codi { font-size: 32px; }
+  .ruta .codi { font-size: 36px; }
   .posicio { display: none; }
   .hud-dades span:nth-child(n+3) { display: none; }
 }
@@ -323,9 +364,11 @@ details.ajuda b { color: var(--text); }
 
 <div id="escriptori">
   <div class="escena" id="escena">
-    <canvas id="globus" aria-label="Globus amb la ruta del vol"></canvas>
+    <div id="mapa" aria-label="Mapa amb la ruta del vol"></div>
+    <canvas id="etiquetes" aria-hidden="true"></canvas>
     <header class="dalt">
       <div class="marca"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 15.5v-2l-8-5V3.2a1.5 1.5 0 0 0-3 0V8.5l-8 5v2l8-2.5v5.3l-2 1.5V21l3.5-1 3.5 1v-1.2l-2-1.5V13z"/></svg>Altitud</div>
+      <button type="button" class="boto-pill" id="b-tema">Cel automàtic</button>
       <div class="posicio vidre">Ets a<b id="pos-codi">BCN</b><span id="pos-nom">Barcelona</span></div>
       <div class="controls">
         <div class="segment vidre" role="group" aria-label="Càmera">
@@ -679,7 +722,7 @@ document.addEventListener("visibilitychange", async () => {
     if (s >= 2 && vol.estat === "en_vol") { try { await refs.vol.update({ turbulencies: (vol.turbulencies || []).concat([{ at: quan, s }]) }); } catch (e) {} }
   }
 });
-function canviaMode(m) { prefs("mode", m); esMobil = m === "mobil"; clauMobil = ""; brut = true; renderTot(); if (esMobil) enviaPresencia(); setTimeout(mida, 0); }
+function canviaMode(m) { prefs("mode", m); esMobil = m === "mobil"; clauMobil = ""; renderTot(); if (esMobil) enviaPresencia(); setTimeout(() => { if (mapa) mapa.resize(); ultimObjectiu = ""; }, 0); }
 
 /* ---------- So ---------- */
 const so = {
@@ -766,32 +809,194 @@ function posicioAvio() {
   return Object.assign(interpRuta(o, d, p), { p });
 }
 
-/* ---------- Mapa ---------- */
-const mapa = { p110: null, f110: null, p50: null, f50: null, perId50: {} };
-let sobrevol = { nom: "", f: null, terra: false };
+/* ---------- Tema segons el sol ---------- */
+let modeTema = prefs("tema2") || "nit";
+let temaActual = null;
+const COLORS_MAPA = {
+  dia: { mar: "#BCD6EF", terra: "#F7F2E8", viva: "#FFE0CC", frontera: "rgba(120,98,66,.45)", costa: "rgba(64,104,150,.40)", grat: "rgba(13,21,36,.07)", nit: "rgba(14,28,60,.10)", ruta: "#FF5B1F", etiqueta: "#2C3849", etiquetaSuau: "rgba(44,56,73,.72)", punt: "#0D1524", visitat: "#2F6BFF", halo: "rgba(247,242,232,.92)", espai: "#E9F0F7" },
+  nit: { mar: "#0A1528", terra: "#18253C", viva: "#30304A", frontera: "rgba(150,180,220,.26)", costa: "rgba(150,180,220,.30)", grat: "rgba(255,255,255,.045)", nit: "rgba(0,0,10,.16)", ruta: "#FF6A33", etiqueta: "#DDE6F3", etiquetaSuau: "rgba(200,214,235,.62)", punt: "#E9EEF6", visitat: "#7FA5FF", halo: "rgba(8,14,26,.85)", espai: "#060B14" }
+};
+function calculaTema() {
+  if (modeTema !== "auto") return modeTema;
+  const o = (vol.estat === "en_vol" && posicioAvio()) || origenActual();
+  return elevacioSol(o.lat, o.lon, ara()) > -4 ? "dia" : "nit";
+}
+function aplicaTema() {
+  const t = calculaTema();
+  $("b-tema").textContent = modeTema === "auto" ? "Cel automàtic" : t === "dia" ? "Cel de dia" : "Cel de nit";
+  if (t === temaActual) return;
+  temaActual = t; document.documentElement.dataset.cel = t;
+  if (mapaLlest) pintaMapa();
+}
+$("b-tema").addEventListener("click", () => {
+  modeTema = modeTema === "nit" ? "dia" : modeTema === "dia" ? "auto" : "nit"; prefs("tema2", modeTema); aplicaTema();
+});
+const C = () => COLORS_MAPA[temaActual || "dia"];
+
+/* ---------- Mapa (MapLibre, WebGL) ---------- */
+const DPR = Math.min(2, window.devicePixelRatio || 1);
+let brut = false;
+let mapa = null, mapaLlest = false, marcador = null, marcadorAfegit = false;
+const mapaDades = { p110: null, p50: null };
 let poblacions = [];
+let sobrevol = { nom: "", f: null, terra: false, prop: null };
+let zOff = 0, zoomUsuari = false, ultimObjectiu = "", seguint = null;
+const AVIO_MARCA = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 15.5v-2l-8-5V3.2a1.5 1.5 0 0 0-3 0V8.5l-8 5v2l8-2.5v5.3l-2 1.5V21l3.5-1 3.5 1v-1.2l-2-1.5V13z" stroke="#fff" stroke-width=".9" stroke-linejoin="round"/></svg>';
+function fc(f) { return { type: "FeatureCollection", features: f || [] }; }
+function graticula() {
+  const f = [];
+  for (let lon = -180; lon < 180; lon += 10) { const c = []; for (let lat = -80; lat <= 80; lat += 2) c.push([lon, lat]); f.push({ type: "Feature", geometry: { type: "LineString", coordinates: c } }); }
+  for (let lat = -80; lat <= 80; lat += 10) { const c = []; for (let lon = -180; lon <= 180; lon += 2) c.push([lon, lat]); f.push({ type: "Feature", geometry: { type: "LineString", coordinates: c } }); }
+  return fc(f);
+}
+function poligonNit(h, ms) {
+  const s = sol(ms), d = s.lat * RAD, sh = Math.sin(h * RAD), nordFosc = Math.sin(d) < sh;
+  const pol = nordFosc ? 85 : -85, pts = [];
+  for (let lon = -180; lon <= 180; lon += 2) {
+    const H = (lon - s.lon) * RAD, a = Math.sin(d), b = Math.cos(d) * Math.cos(H);
+    const R = Math.hypot(a, b), al = Math.atan2(b, a), x = sh / R;
+    let lat;
+    if (x >= 1) lat = nordFosc ? -85 : 85; else if (x <= -1) lat = pol;
+    else {
+      let p = Math.asin(x) - al;
+      if (p < -Math.PI / 2 || p > Math.PI / 2) { p = Math.PI - Math.asin(x) - al; while (p > Math.PI) p -= TAU; while (p < -Math.PI) p += TAU; }
+      lat = Math.max(-85, Math.min(85, p / RAD));
+    }
+    pts.push([lon, lat]);
+  }
+  return { type: "Feature", geometry: { type: "Polygon", coordinates: [pts.concat([[180, pol], [-180, pol], pts[0]])] } };
+}
+function rumb(a, b) {
+  const f1 = a.lat * RAD, f2 = b.lat * RAD, dl = (b.lon - a.lon) * RAD;
+  return (Math.atan2(Math.sin(dl) * Math.cos(f2), Math.cos(f1) * Math.sin(f2) - Math.sin(f1) * Math.cos(f2) * Math.cos(dl)) / RAD + 360) % 360;
+}
+function rumbAvio() {
+  const p = posicioAvio(); if (!p) return 0;
+  const o = PER_CODI[vol.origen], d = PER_CODI[vol.desti];
+  return rumb(interpRuta(o, d, Math.max(0, p.p - 0.002)), interpRuta(o, d, Math.min(1, p.p + 0.002)));
+}
+function iniciaMapa() {
+  if (!window.maplibregl) { $("mapa").innerHTML = '<p class="sense-mapa">No s\'ha pogut carregar el mapa.</p>'; return; }
+  const o = origenActual();
+  try {
+    mapa = new maplibregl.Map({
+      container: "mapa", attributionControl: false, renderWorldCopies: false, maxPitch: 72, fadeDuration: 0,
+      center: [o.lon + 6, o.lat + 2], zoom: 2.6,
+      style: {
+        version: 8, projection: { type: "globe" },
+        sources: {
+          paisos: { type: "geojson", data: fc(), tolerance: 0.4 }, fronteres: { type: "geojson", data: fc(), tolerance: 0.4 },
+          grat: { type: "geojson", data: graticula() }, nit: { type: "geojson", data: fc() },
+          ruta: { type: "geojson", data: fc() }, fet: { type: "geojson", data: fc() }, viva: { type: "geojson", data: fc() }
+        },
+        layers: [
+          { id: "mar", type: "background", paint: { "background-color": "#BCD6EF" } },
+          { id: "grat", type: "line", source: "grat", paint: { "line-color": "#000", "line-width": 0.6 } },
+          { id: "terra", type: "fill", source: "paisos", paint: { "fill-color": "#F7F2E8" } },
+          { id: "viva", type: "fill", source: "viva", paint: { "fill-color": "#FFE0CC" } },
+          { id: "costa", type: "line", source: "paisos", paint: { "line-color": "#000", "line-width": ["interpolate", ["linear"], ["zoom"], 2, 0.5, 8, 1.2] } },
+          { id: "fronteres", type: "line", source: "fronteres", paint: { "line-color": "#000", "line-width": ["interpolate", ["linear"], ["zoom"], 2, 0.5, 8, 1.3], "line-dasharray": [3, 2] } },
+          { id: "nit", type: "fill", source: "nit", paint: { "fill-color": "#000", "fill-antialias": false } },
+          { id: "ruta", type: "line", source: "ruta", layout: { "line-cap": "round" }, paint: { "line-color": "#FF5B1F", "line-width": 2, "line-dasharray": [1.5, 2], "line-opacity": 0.85 } },
+          { id: "fet-halo", type: "line", source: "fet", layout: { "line-cap": "round" }, paint: { "line-color": "#FF5B1F", "line-width": 12, "line-opacity": 0.18, "line-blur": 6 } },
+          { id: "fet", type: "line", source: "fet", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#FF5B1F", "line-width": 3.2 } }
+        ]
+      }
+    });
+  } catch (e) { mapa = null; $("mapa").innerHTML = '<p class="sense-mapa">Aquest navegador no pot mostrar el mapa (cal WebGL).</p>'; return; }
+  mapa.on("load", () => { mapaLlest = true; pintaMapa(); actualitzaNit(); ultimaRuta = ""; actualitzaRuta(); carregaMapa(); });
+  mapa.on("render", dibuixaEtiquetes);
+  const usuari = (e) => e && e.originalEvent;
+  mapa.on("dragstart", (e) => { if (usuari(e)) setLliure(true); });
+  mapa.on("rotatestart", (e) => { if (usuari(e)) setLliure(true); });
+  mapa.on("pitchstart", (e) => { if (usuari(e)) setLliure(true); });
+  mapa.on("zoomstart", (e) => { if (usuari(e)) zoomUsuari = true; });
+  mapa.on("zoomend", (e) => {
+    if (!zoomUsuari) return; zoomUsuari = false;
+    const t = objectiuCam(); if (!lliure && t && t.zb != null) zOff = Math.max(-5, Math.min(6, mapa.getZoom() - t.zb));
+  });
+  const el = document.createElement("div"); el.className = "avio-marcador"; el.innerHTML = AVIO_MARCA;
+  marcador = new maplibregl.Marker({ element: el, rotationAlignment: "map", pitchAlignment: "map" }).setLngLat([0, 0]);
+}
+function pintaMapa() {
+  if (!mapaLlest) return;
+  const c = C();
+  try {
+    mapa.setPaintProperty("mar", "background-color", c.mar);
+    mapa.setPaintProperty("grat", "line-color", c.grat);
+    mapa.setPaintProperty("terra", "fill-color", c.terra);
+    mapa.setPaintProperty("viva", "fill-color", c.viva);
+    mapa.setPaintProperty("costa", "line-color", c.costa);
+    mapa.setPaintProperty("fronteres", "line-color", c.frontera);
+    mapa.setPaintProperty("nit", "fill-color", c.nit);
+    ["ruta", "fet", "fet-halo"].forEach(l => mapa.setPaintProperty(l, "line-color", c.ruta));
+    if (mapa.setSky) mapa.setSky({ "sky-color": c.espai, "horizon-color": c.mar, "fog-color": c.espai, "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 1, 7, 0] });
+  } catch (e) {}
+}
 async function carregaMapa() {
-  if (!window.d3 || !window.topojson) return;
-  fetch("ciutats.json").then(r => r.json()).then(d => { poblacions = d; brut = true; }).catch(() => {});
+  fetch("ciutats.json").then(r => r.json()).then(d => { poblacions = d; }).catch(() => {});
+  if (!window.topojson) return;
   try {
     const w = await (await fetch("countries-110m.json")).json();
-    mapa.p110 = topojson.feature(w, w.objects.countries); mapa.f110 = topojson.mesh(w, w.objects.countries, (a, b) => a !== b);
-    brut = true;
+    mapaDades.p110 = topojson.feature(w, w.objects.countries);
+    mapa.getSource("paisos").setData(mapaDades.p110);
+    mapa.getSource("fronteres").setData(topojson.mesh(w, w.objects.countries, (a, b) => a !== b));
     const w2 = await (await fetch("countries-50m.json")).json();
-    mapa.p50 = topojson.feature(w2, w2.objects.countries); mapa.f50 = topojson.mesh(w2, w2.objects.countries, (a, b) => a !== b);
-    mapa.p50.features.forEach(f => { mapa.perId50[f.id + "|" + f.properties.name] = f; });
-    sobrevol.f = null; brut = true;
+    mapaDades.p50 = topojson.feature(w2, w2.objects.countries);
+    mapa.getSource("paisos").setData(mapaDades.p50);
+    mapa.getSource("fronteres").setData(topojson.mesh(w2, w2.objects.countries, (a, b) => a !== b));
+    sobrevol.f = null;
   } catch (e) {}
+}
+function actualitzaNit() {
+  if (!mapaLlest) return;
+  const t = ara();
+  mapa.getSource("nit").setData(fc([poligonNit(-0.8, t), poligonNit(-6, t), poligonNit(-12, t)]));
+}
+let ultimaRuta = "";
+function puntsRuta(o, d, fins) {
+  const n = Math.max(2, Math.round(160 * fins)), pts = [];
+  for (let i = 0; i <= n; i++) { const p = interpRuta(o, d, (i / n) * fins); pts.push([p.lon, p.lat]); }
+  return pts;
+}
+function actualitzaRuta() {
+  if (!mapaLlest) return;
+  const r = rutaActiva(), k = r ? r[0].codi + r[1].codi : "";
+  if (k !== ultimaRuta) {
+    ultimaRuta = k;
+    mapa.getSource("ruta").setData(r ? { type: "Feature", geometry: { type: "LineString", coordinates: puntsRuta(r[0], r[1], 1) } } : fc());
+  }
+  actualitzaFet();
+}
+function actualitzaFet() {
+  if (!mapaLlest) return;
+  const r = rutaActiva(), pos = (vol.estat === "en_vol" || vol.estat === "aterrat") ? posicioAvio() : null;
+  mapa.getSource("fet").setData(r && pos && pos.p > 0.0005 ? { type: "Feature", geometry: { type: "LineString", coordinates: puntsRuta(r[0], r[1], pos.p) } } : fc());
+  if (pos && r) {
+    if (!marcadorAfegit) { marcador.addTo(mapa); marcadorAfegit = true; }
+  } else if (marcadorAfegit) { marcador.remove(); marcadorAfegit = false; }
+}
+function posaAvio() {
+  if (!marcadorAfegit) return;
+  const p = posicioAvio(); if (!p) return;
+  marcador.setLngLat([p.lon, p.lat]); marcador.setRotation(rumbAvio());
+}
+let vivaId = null;
+function actualitzaViva() {
+  if (!mapaLlest) return;
+  const f = vol.estat === "en_vol" && sobrevol.f ? sobrevol.f : null, id = f ? f.id + f.properties.name : null;
+  if (id === vivaId) return; vivaId = id;
+  mapa.getSource("viva").setData(f ? fc([f]) : fc());
 }
 function actualitzaSobrevol(pos) {
   if (!pos || !window.d3) return;
-  const P = mapa.p50 || mapa.p110; if (!P) return;
+  const P = mapaDades.p50 || mapaDades.p110; if (!P) return;
   const pt = [pos.lon, pos.lat];
   const cp = ciutatPropera(pos); sobrevol.prop = cp;
   if (sobrevol.f && d3.geoContains(sobrevol.f, pt)) return;
   const f = P.features.find(x => d3.geoContains(x, pt)) || null;
   sobrevol = { f, nom: f ? (PAISOS[f.properties.name] || f.properties.name) : nomMar(pos.lat, pos.lon), terra: !!f, prop: cp };
-  brut = true;
+  actualitzaViva();
 }
 function ciutatPropera(pos) {
   let millor = null, dm = 1e9;
@@ -801,198 +1006,139 @@ function ciutatPropera(pos) {
   }
   return millor && dm < 90 ? { nom: millor[0], km: dm } : null;
 }
-
-const cv = $("globus"), ctx = cv.getContext("2d");
-let W = 0, H = 0, DPR = 1, brut = true;
-const cam = { lon: 6, lat: 44, R: 900, g: 0, oy: 0 };
-let proj = null, cami = null;
-if (window.d3) { proj = d3.geoOrthographic().clipAngle(90).precision(0.6); cami = d3.geoPath(proj, ctx); }
-const graticula = window.d3 ? d3.geoGraticule10() : null;
-function mida() {
-  const r = cv.getBoundingClientRect(); DPR = Math.min(2, window.devicePixelRatio || 1);
-  W = r.width; H = r.height; cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); brut = true;
-}
-function zonaVisible() {
-  const ample = window.innerWidth >= 900;
-  const esq = ample ? 404 + 32 : 0, dalt = ample ? 64 : 104;
-  const baix = vol.estat === "en_vol" ? (ample ? 130 : 120) : 16;
-  return { cx: (esq + W) / 2, cy: (dalt + H - baix) / 2, w: Math.max(100, W - esq), h: Math.max(100, H - dalt - baix) };
-}
 function rutaActiva() {
   if (vol.origen && vol.estat !== "terra" && vol.estat !== "escala") return [PER_CODI[vol.origen], PER_CODI[vol.desti]];
   if (vol.estat === "terra" && tria.desti) return [origenActual(), PER_CODI[tria.desti]];
   return null;
 }
+
+/* Càmera */
+function mapaMida() { const c = $("mapa"); return { w: c.clientWidth, h: c.clientHeight }; }
+function paddingBase() {
+  const ample = window.innerWidth >= 900, m = mapaMida();
+  return { left: ample ? 424 : 20, right: ample ? 40 : 20, top: ample ? 84 : 120, bottom: vol.estat === "en_vol" ? (ample ? 150 : 140) : 30, w: m.w, h: m.h };
+}
 function objectiuCam() {
-  const z = zonaVisible(), base = Math.min(z.w, z.h) / 2;
+  const pb = paddingBase();
   if (vol.estat === "en_vol" && (modeCam === "seguir" || modeCam === "pilot")) {
     const p = posicioAvio();
-    if (modeCam === "seguir") return { lon: p.lon, lat: p.lat, R: base * 12 * zoomMult, g: 0, oy: 0 };
-    const o = PER_CODI[vol.origen], d = PER_CODI[vol.desti];
-    const n = interpRuta(o, d, Math.min(1, p.p + 0.003)), b = interpRuta(o, d, Math.max(0, p.p - 0.003));
-    const pr = d3.geoOrthographic().scale(1000).translate([0, 0]).rotate([-p.lon, -p.lat, 0]);
-    const A = pr([b.lon, b.lat]), B = pr([n.lon, n.lat]);
-    const a0 = Math.atan2(B[1] - A[1], B[0] - A[0]) / RAD;
-    return { lon: p.lon, lat: p.lat, R: base * 26 * zoomMult, g: a0 + 90, oy: z.h * 0.24 };
+    if (modeCam === "seguir") return { tipus: "segueix", lon: p.lon, lat: p.lat, zb: 6.3, bearing: 0, pitch: 0, top: pb.top, pb };
+    return { tipus: "segueix", lon: p.lon, lat: p.lat, zb: 7.6, bearing: rumbAvio(), pitch: 66, top: Math.max(pb.top, pb.h * 0.46), pb };
   }
   const r = rutaActiva();
-  if (r && window.d3) {
-    const a = d3.geoDistance([r[0].lon, r[0].lat], [r[1].lon, r[1].lat]);
-    const m = d3.geoInterpolate([r[0].lon, r[0].lat], [r[1].lon, r[1].lat])(0.5);
-    const R = Math.max(base * 0.95, Math.min(base * 40, base * 0.78 / Math.sin(Math.min(a / 2 + 0.05, 1.35))));
-    return { lon: m[0], lat: m[1], R: R * zoomMult, g: 0, oy: 0 };
-  }
-  const o = origenActual(); return { lon: o.lon + 6, lat: o.lat + 2, R: base * 2.4 * zoomMult, g: 0, oy: 0 };
+  if (r) return { tipus: "encaixa", clau: r[0].codi + r[1].codi + vol.estat + pb.w + "x" + pb.h, r, pb };
+  const o = origenActual();
+  return { tipus: "centra", clau: "o" + o.codi + pb.w + "x" + pb.h, lon: o.lon + 6, lat: o.lat + 2, zoom: 2.8, pb };
 }
 function mouCamera() {
-  if (lliure) return false;
-  const t = objectiuCam(); const k = 0.075;
-  const dl = ((t.lon - cam.lon + 540) % 360) - 180;
-  const dlat = t.lat - cam.lat, dr = Math.log(t.R / cam.R);
-  const dg = ((t.g - cam.g + 540) % 360) - 180, doy = t.oy - cam.oy;
-  cam.lon += dl * k; cam.lat += dlat * k; cam.R *= Math.exp(dr * k); cam.g += dg * k; cam.oy += doy * k;
-  return Math.abs(dl) > 0.002 || Math.abs(dlat) > 0.002 || Math.abs(dr) > 0.002 || Math.abs(dg) > 0.05 || Math.abs(doy) > 0.5;
+  if (!mapaLlest || lliure) return;
+  const t = objectiuCam(), pb = t.pb;
+  const pad = { left: pb.left, right: pb.right, top: t.top || pb.top, bottom: pb.bottom };
+  if (t.tipus !== "segueix") {
+    seguint = null;
+    if (t.clau === ultimObjectiu) return; ultimObjectiu = t.clau;
+    if (t.tipus === "encaixa") {
+      const pts = puntsRuta(t.r[0], t.r[1], 1);
+      let w = 180, e = -180, s = 90, n = -90; pts.forEach(q => { w = Math.min(w, q[0]); e = Math.max(e, q[0]); s = Math.min(s, q[1]); n = Math.max(n, q[1]); });
+      const cam = mapa.cameraForBounds([[w, s], [e, n]], { padding: { left: pb.left + 40, right: pb.right + 40, top: pb.top + 40, bottom: pb.bottom + 40 } });
+      if (cam) mapa.easeTo({ center: cam.center, zoom: Math.min(7, cam.zoom + zOff), bearing: 0, pitch: 0, duration: 1500, padding: { left: 0, right: 0, top: 0, bottom: 0 } });
+    } else mapa.easeTo({ center: [t.lon, t.lat], zoom: t.zoom + zOff, bearing: 0, pitch: 0, duration: 1500, padding: { left: 0, right: 0, top: 0, bottom: 0 } });
+    return;
+  }
+  ultimObjectiu = "";
+  if (!seguint) { const c = mapa.getCenter(), p = mapa.getPadding(); seguint = { lon: c.lng, lat: c.lat, zoom: mapa.getZoom(), bearing: mapa.getBearing(), pitch: mapa.getPitch(), top: p.top || 0, left: p.left || 0, bottom: p.bottom || 0 }; }
+  const k = 0.06, s = seguint;
+  s.lon += (((t.lon - s.lon + 540) % 360) - 180) * k; s.lat += (t.lat - s.lat) * k;
+  if (!zoomUsuari) s.zoom += (t.zb + zOff - s.zoom) * k; else s.zoom = mapa.getZoom();
+  s.bearing += (((t.bearing - s.bearing + 540) % 360) - 180) * k; s.pitch += (t.pitch - s.pitch) * k;
+  s.top += (pad.top - s.top) * k; s.left += (pad.left - s.left) * k; s.bottom += (pad.bottom - s.bottom) * k;
+  const opts = { center: [s.lon, s.lat], bearing: s.bearing, pitch: s.pitch, padding: { top: s.top, left: s.left, bottom: s.bottom, right: pad.right } };
+  if (!zoomUsuari) opts.zoom = s.zoom;
+  mapa.jumpTo(opts);
 }
-function textEscala() {
-  const km = 6371 * (Math.min(W, H) / 2) / cam.R * 2;
-  return km > 1500 ? Math.round(km / 100) * 100 + " km" : km > 150 ? Math.round(km / 10) * 10 + " km" : Math.round(km) + " km";
-}
-function dibuixaAvio(x, y, ang, escala) {
-  ctx.save(); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.scale(escala, escala);
-  ctx.shadowColor = "rgba(255,181,71,.8)"; ctx.shadowBlur = 14;
-  ctx.fillStyle = "#FFB547"; ctx.strokeStyle = "#050A14"; ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(0, -12); ctx.bezierCurveTo(1.6, -11, 1.6, -8, 1.6, -4); ctx.lineTo(11, 2); ctx.lineTo(11, 4); ctx.lineTo(1.6, 1.5);
-  ctx.lineTo(1.4, 7.5); ctx.lineTo(4.5, 10); ctx.lineTo(4.5, 11.5); ctx.lineTo(0, 10.3); ctx.lineTo(-4.5, 11.5); ctx.lineTo(-4.5, 10);
-  ctx.lineTo(-1.4, 7.5); ctx.lineTo(-1.6, 1.5); ctx.lineTo(-11, 4); ctx.lineTo(-11, 2); ctx.lineTo(-1.6, -4); ctx.bezierCurveTo(-1.6, -8, -1.6, -11, 0, -12);
-  ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0; ctx.stroke(); ctx.restore();
-}
-function visibleGeo(lon, lat) { return d3.geoDistance([lon, lat], [cam.lon, cam.lat]) < Math.PI / 2 - 0.02; }
-
-function dibuixaGlobus(t) {
-  if (!W) return;
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.fillStyle = "#050A14"; ctx.fillRect(0, 0, W, H);
-  if (!proj) { ctx.fillStyle = "#8D9DB6"; ctx.font = "14px Manrope, sans-serif"; ctx.fillText("No s'ha pogut carregar el mapa.", 24, H - 40); return; }
-  const z = zonaVisible();
-  proj.rotate([-cam.lon, -cam.lat, cam.g]).scale(cam.R).translate([z.cx, z.cy + cam.oy]);
-  if (cam.R < Math.max(W, H) * 1.4) {
-    const g = ctx.createRadialGradient(z.cx, z.cy, cam.R * 0.96, z.cx, z.cy, cam.R * 1.16);
-    g.addColorStop(0, "rgba(116,200,255,.30)"); g.addColorStop(1, "rgba(116,200,255,0)");
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(z.cx, z.cy, cam.R * 1.16, 0, TAU); ctx.fill();
-  }
-  ctx.beginPath(); cami({ type: "Sphere" }); ctx.fillStyle = "#0A1830"; ctx.fill();
-  ctx.beginPath(); cami(graticula); ctx.strokeStyle = "rgba(140,175,220,.07)"; ctx.lineWidth = 0.7; ctx.stroke();
-  const detall = mapa.p50 && cam.R > Math.min(W, H) * 1.5;
-  const P = detall ? mapa.p50 : mapa.p110, F = detall ? mapa.f50 : mapa.f110;
-  if (P) {
-    ctx.beginPath(); cami(P); ctx.fillStyle = "#1B2E49"; ctx.fill(); ctx.strokeStyle = "rgba(150,190,240,.28)"; ctx.lineWidth = 0.7; ctx.stroke();
-    if (sobrevol.f && vol.estat === "en_vol") {
-      const f = detall ? (mapa.perId50[sobrevol.f.id + "|" + sobrevol.f.properties.name] || sobrevol.f) : sobrevol.f;
-      ctx.beginPath(); cami(f); ctx.fillStyle = "#24405F"; ctx.fill();
-    }
-    ctx.beginPath(); cami(F); ctx.strokeStyle = "rgba(140,175,220,.24)"; ctx.lineWidth = 0.8; ctx.stroke();
-  }
-  const s = sol(ara()); const anti = [s.lon + 180, -s.lat];
-  ctx.fillStyle = "rgba(1,3,10,.14)";
-  [90, 86, 82].forEach(r => { ctx.beginPath(); cami(d3.geoCircle().center(anti).radius(r)()); ctx.fill(); });
-
-  const r = rutaActiva();
-  const pos = (vol.estat === "en_vol" || vol.estat === "aterrat") ? posicioAvio() : null;
-  if (r) {
-    const [o, d] = r;
-    ctx.setLineDash([5, 7]); ctx.strokeStyle = "rgba(255,181,71,.55)"; ctx.lineWidth = 1.8;
-    ctx.beginPath(); cami({ type: "LineString", coordinates: [[o.lon, o.lat], [d.lon, d.lat]] }); ctx.stroke(); ctx.setLineDash([]);
-    if (pos && pos.p > 0.0005) {
-      const ln = { type: "LineString", coordinates: [[o.lon, o.lat], [pos.lon, pos.lat]] };
-      ctx.strokeStyle = "rgba(255,181,71,.22)"; ctx.lineWidth = 8; ctx.beginPath(); cami(ln); ctx.stroke();
-      ctx.strokeStyle = "#FFB547"; ctx.lineWidth = 2.6; ctx.beginPath(); cami(ln); ctx.stroke();
-    }
-  }
-  const vis = new Set(diari.visitades || []);
-  const base = Math.min(z.w, z.h) / 2;
-  const totes = cam.R > base * 3;
-  if (poblacions.length && cam.R > base * 6) {
-    const rang = Math.asin(Math.min(1, Math.hypot(W, H) / cam.R)) / RAD + 0.5;
-    const ocupat_ = []; let n = 0;
-    CIUTATS.forEach(c => { if (!visibleGeo(c[3], c[2])) return; const q = proj([c[3], c[2]]); if (q) ocupat_.push([q[0] - 8, q[1] - 10, q[0] + 110, q[1] + 10]); });
-    const minPob = cam.R > base * 30 ? 0 : cam.R > base * 16 ? 60 : cam.R > base * 10 ? 150 : 400;
-    ctx.font = "500 11px Manrope, sans-serif"; ctx.textBaseline = "middle";
-    for (let i = 0; i < poblacions.length && n < 70; i++) {
-      const c = poblacions[i]; if (c[3] < minPob) break;
-      if (Math.abs(c[1] - cam.lat) > rang || Math.abs(((c[2] - cam.lon + 540) % 360) - 180) > rang / Math.max(0.2, Math.cos(cam.lat * RAD))) continue;
-      if (PER_CODI_NOM[c[0]]) continue;
-      const q = proj([c[2], c[1]]); if (!q || q[0] < 0 || q[0] > W || q[1] < 0 || q[1] > H) continue;
-      const w = ctx.measureText(c[0]).width + 12, caixa = [q[0] - 3, q[1] - 8, q[0] + w, q[1] + 8];
-      if (ocupat_.some(o => !(caixa[2] < o[0] || caixa[0] > o[2] || caixa[3] < o[1] || caixa[1] > o[3]))) continue;
-      ocupat_.push(caixa); n++;
-      ctx.beginPath(); ctx.arc(q[0], q[1], c[3] > 500 ? 2.4 : 1.8, 0, TAU); ctx.fillStyle = "rgba(200,214,235,.55)"; ctx.fill();
-      ctx.fillStyle = c[3] > 500 ? "rgba(200,214,235,.75)" : "rgba(200,214,235,.5)"; ctx.fillText(c[0], q[0] + 6, q[1]);
-    }
-  }
-  ctx.textBaseline = "middle";
-  CIUTATS.forEach(c => {
-    const ci = PER_CODI[c[0]];
-    if (!visibleGeo(ci.lon, ci.lat)) return;
-    const q = proj([ci.lon, ci.lat]); if (!q || q[0] < -40 || q[0] > W + 40 || q[1] < -40 || q[1] > H + 40) return;
-    const clau = r && (ci.codi === r[0].codi || ci.codi === r[1].codi);
-    const aqui = ci.codi === diari.ubicacio;
-    ctx.beginPath(); ctx.arc(q[0], q[1], clau ? 4.5 : 2.6, 0, TAU);
-    ctx.fillStyle = clau ? "#E9EFF8" : vis.has(ci.codi) ? "#74C8FF" : "rgba(233,239,248,.35)"; ctx.fill();
-    if (clau) { ctx.beginPath(); ctx.arc(q[0], q[1], 9, 0, TAU); ctx.strokeStyle = "rgba(233,239,248,.5)"; ctx.lineWidth = 1; ctx.stroke(); }
-    if (clau || aqui || totes) {
-      ctx.font = clau ? "600 13px Manrope, sans-serif" : "500 11px Manrope, sans-serif";
-      ctx.fillStyle = clau ? "#E9EFF8" : "rgba(200,214,235,.7)";
-      ctx.fillText(clau || cam.R > base * 6 ? ci.nom : ci.codi, q[0] + (clau ? 14 : 7), q[1]);
-    }
-  });
-  if (pos && r && visibleGeo(pos.lon, pos.lat)) {
-    const [o, d] = r;
-    const a = proj([pos.lon, pos.lat]);
-    const p2 = interpRuta(o, d, Math.min(1, pos.p + 0.002)), p0 = interpRuta(o, d, Math.max(0, pos.p - 0.002));
-    const b = proj([p2.lon, p2.lat]), c = proj([p0.lon, p0.lat]);
-    const ang = Math.atan2(b[1] - c[1], b[0] - c[0]);
-    if (vol.estat === "en_vol") {
-      const pul = (t / 1600) % 1;
-      ctx.beginPath(); ctx.arc(a[0], a[1], 10 + pul * 26, 0, TAU); ctx.strokeStyle = "rgba(255,181,71," + (0.45 * (1 - pul)) + ")"; ctx.lineWidth = 1.5; ctx.stroke();
-    }
-    dibuixaAvio(a[0], a[1], ang, cam.R > base * 20 ? 2.1 : cam.R > base * 4 ? 1.6 : 1.1);
-  }
-}
-
-/* Interacció amb el globus */
-let arr = null;
-cv.addEventListener("pointerdown", (e) => { arr = { x: e.clientX, y: e.clientY, lon: cam.lon, lat: cam.lat, mogut: false }; try { cv.setPointerCapture(e.pointerId); } catch (er) {} });
-cv.addEventListener("pointermove", (e) => {
-  if (!arr) return;
-  const dx = e.clientX - arr.x, dy = e.clientY - arr.y;
-  if (!arr.mogut && Math.hypot(dx, dy) < 4) return;
-  if (!lliure) { cam.g = 0; cam.oy = 0; }
-  arr.mogut = true; setLliure(true);
-  const f = 180 / Math.PI / cam.R;
-  cam.lon = arr.lon - dx * f; cam.lat = Math.max(-80, Math.min(80, arr.lat + dy * f)); brut = true;
-});
-cv.addEventListener("pointerup", () => { arr = null; });
-cv.addEventListener("pointercancel", () => { arr = null; });
-cv.addEventListener("wheel", (e) => {
-  e.preventDefault();
-  const f = Math.exp(-e.deltaY * 0.0015);
-  fesZoom(f);
-}, { passive: false });
-function setLliure(v) { lliure = v; $("b-recentrar").hidden = !v; }
+function setLliure(v) { lliure = v; $("b-recentrar").hidden = !v; if (!v) { ultimObjectiu = ""; seguint = null; } }
 document.querySelectorAll("[data-cam]").forEach(b => b.addEventListener("click", () => {
-  modeCam = b.dataset.cam; prefs("cam", modeCam); zoomMult = 1; setLliure(false); brut = true;
+  modeCam = b.dataset.cam; prefs("cam", modeCam); zOff = 0; setLliure(false);
   document.querySelectorAll("[data-cam]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
 }));
-$("b-recentrar").addEventListener("click", () => { zoomMult = 1; setLliure(false); });
-function fesZoom(f) {
-  if (lliure) cam.R = Math.max(150, Math.min(80000, cam.R * f));
-  else zoomMult = Math.max(0.2, Math.min(6, zoomMult * f));
-  brut = true;
-}
-$("z-mes").addEventListener("click", () => fesZoom(1.6));
-$("z-menys").addEventListener("click", () => fesZoom(1 / 1.6));
 document.querySelectorAll("[data-cam]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.cam === modeCam)));
+$("b-recentrar").addEventListener("click", () => { zOff = 0; setLliure(false); });
+function fesZoom(d) {
+  if (!mapaLlest) return;
+  const t = objectiuCam();
+  if (lliure || t.tipus !== "segueix") { mapa.easeTo({ zoom: mapa.getZoom() + d, duration: 400 }); if (!lliure) zOff += d; }
+  else zOff = Math.max(-5, Math.min(6, zOff + d));
+}
+$("z-mes").addEventListener("click", () => fesZoom(0.8));
+$("z-menys").addEventListener("click", () => fesZoom(-0.8));
+function textEscala() {
+  if (!mapaLlest) return "—";
+  const c = mapa.getCenter(), mpx = 40075016.686 * Math.cos(c.lat * RAD) / (512 * Math.pow(2, mapa.getZoom()));
+  const km = mpx * mapaMida().w / 1000;
+  return km > 1500 ? Math.round(km / 100) * 100 + " km" : km > 150 ? Math.round(km / 10) * 10 + " km" : Math.max(1, Math.round(km)) + " km";
+}
+
+/* Etiquetes de ciutats (capa 2D sincronitzada amb el mapa) */
+const ce = $("etiquetes"), ex = ce.getContext("2d");
+function dibuixaEtiquetes() {
+  if (!mapaLlest) return;
+  const m = mapaMida();
+  if (ce.width !== Math.round(m.w * DPR) || ce.height !== Math.round(m.h * DPR)) { ce.width = Math.round(m.w * DPR); ce.height = Math.round(m.h * DPR); }
+  ex.setTransform(DPR, 0, 0, DPR, 0, 0); ex.clearRect(0, 0, m.w, m.h);
+  const z = mapa.getZoom(), cen = mapa.getCenter(), col = C(), pitch = mapa.getPitch();
+  const centre = { lat: cen.lat, lon: cen.lng };
+  const maxKm = z < 3.5 ? 8200 : Math.min(6000, 42000 / Math.pow(2, z - 2)) * (pitch > 30 ? 1.25 : 1);
+  const r = rutaActiva(), vis = new Set(diari.visitades || []);
+  const ocup = [];
+  const lliure_ = (b) => !ocup.some(o => !(b[2] < o[0] || b[0] > o[2] || b[3] < o[1] || b[1] > o[3]));
+  const marge = pitch > 30 ? m.h * 0.18 : -20;
+  const projecta = (lon, lat) => {
+    if (distancia(centre, { lat, lon }) > maxKm) return null;
+    const q = mapa.project([lon, lat]);
+    if (!q || q.x < -20 || q.x > m.w + 20 || q.y < marge || q.y > m.h + 20) return null;
+    return q;
+  };
+  const text = (t, x, y, font, color) => {
+    ex.font = font; ex.lineWidth = 3.5; ex.strokeStyle = col.halo; ex.lineJoin = "round";
+    ex.strokeText(t, x, y); ex.fillStyle = color; ex.fillText(t, x, y);
+  };
+  ex.textBaseline = "middle";
+  // Ciutats de destinació
+  const claus = [];
+  CIUTATS.forEach(c => {
+    const ci = PER_CODI[c[0]], q = projecta(ci.lon, ci.lat); if (!q) return;
+    const clau = r && (ci.codi === r[0].codi || ci.codi === r[1].codi), aqui = ci.codi === diari.ubicacio;
+    claus.push({ ci, q, clau, aqui, prio: clau ? 0 : aqui ? 1 : 2 });
+  });
+  claus.sort((a, b) => a.prio - b.prio);
+  claus.forEach(({ ci, q, clau, aqui }) => {
+    ex.beginPath(); ex.arc(q.x, q.y, clau ? 5 : 3.2, 0, TAU);
+    ex.fillStyle = clau ? col.punt : vis.has(ci.codi) ? col.visitat : col.halo; ex.fill();
+    ex.lineWidth = 1.5; ex.strokeStyle = clau ? col.halo : vis.has(ci.codi) ? col.halo : col.etiquetaSuau; ex.stroke();
+    if (clau) { ex.beginPath(); ex.arc(q.x, q.y, 10, 0, TAU); ex.strokeStyle = col.punt; ex.lineWidth = 1.2; ex.stroke(); }
+    if (!(clau || aqui || z > 3.3)) return;
+    const nom = clau || z > 4.6 ? ci.nom : ci.codi, font = clau ? "700 14px Geist, system-ui, sans-serif" : "600 12px Geist, system-ui, sans-serif";
+    ex.font = font; const w = ex.measureText(nom).width;
+    const b = [q.x - 4, q.y - 9, q.x + 14 + w, q.y + 9];
+    if (!clau && !lliure_(b)) return; ocup.push(b);
+    text(nom, q.x + (clau ? 15 : 8), q.y, font, clau ? col.etiqueta : col.etiquetaSuau);
+  });
+  // Poblacions quan t'apropes
+  if (poblacions.length && z > 4.6) {
+    const minPob = z > 8 ? 0 : z > 7 ? 60 : z > 6 ? 150 : z > 5.3 ? 300 : 700;
+    let n = 0;
+    for (let i = 0; i < poblacions.length && n < 90; i++) {
+      const c = poblacions[i]; if (c[3] < minPob) break;
+      if (Math.abs(c[1] - cen.lat) > 25 || PER_CODI_NOM[c[0]]) continue;
+      const q = projecta(c[2], c[1]); if (!q) continue;
+      const font = c[3] > 500 ? "600 12px Geist, system-ui, sans-serif" : "500 11px Geist, system-ui, sans-serif";
+      ex.font = font; const w = ex.measureText(c[0]).width, b = [q.x - 3, q.y - 8, q.x + 10 + w, q.y + 8];
+      if (!lliure_(b)) continue; ocup.push(b); n++;
+      ex.beginPath(); ex.arc(q.x, q.y, 2.2, 0, TAU); ex.fillStyle = col.etiquetaSuau; ex.fill();
+      text(c[0], q.x + 7, q.y, font, col.etiquetaSuau);
+    }
+  }
+}
 
 /* ---------- Finestreta ---------- */
 const cf = $("c-finestra"), fx = cf.getContext("2d");
@@ -1296,7 +1442,7 @@ function renderMobil() {
   const e = vol.estat || "terra";
   const k = e + (vol.id || "") + (vol.fiAt || "") + (aBord ? "b" : "") + (wake ? "w" : "") + (remot ? "r" : "") + (vol.objectiuFet == null ? "" : vol.objectiuFet) + (diari.minuts || 0);
   if (k === clauMobil) return; clauMobil = k;
-  vm.classList.toggle("en-vol", e === "en_vol");
+  vm.classList.toggle("en-vol", e === "en_vol"); document.body.classList.toggle("en-vol-mobil", e === "en_vol");
   const cap = '<div class="mobil-cap"><span class="marca" style="font-size:18px">' + IC.avio.replace("<svg", '<svg style="width:22px;height:22px;color:var(--ambre)"') + 'Altitud</span><span class="eyebrow">' + (remot ? "Enllaçat" : "Sense compte") + '</span></div>';
   const peu = '<button type="button" class="canvi-mode" id="m-mode">Veure la versió completa</button>';
   let cos = "";
@@ -1357,6 +1503,7 @@ function renderTot() {
     }
   }
   so.aplica();
+  actualitzaRuta(); actualitzaViva(); aplicaTema();
 }
 $("b-finestra").addEventListener("click", () => {
   finestraOn = !finestraOn; prefs("finestra", finestraOn ? "1" : "0");
@@ -1403,24 +1550,28 @@ function tick() {
   revisaAnuncis(s);
 }
 
-let ultimTick = 0, ultimDibuix = 0;
+let ultimTick = 0, ultimFet = 0, ultimNit = 0, ultimTema = 0;
 function bucle(t) {
   if (t - ultimTick > 250) { ultimTick = t; tick(); if (!esMobil) $("z-escala").textContent = textEscala(); }
   if (!esMobil) {
-    const mou = mouCamera();
-    const envol = vol.estat === "en_vol";
-    if (mou || brut || arr || (envol && t - ultimDibuix > 33) || t - ultimDibuix > 20000) { dibuixaGlobus(t); ultimDibuix = t; brut = false; }
-    if (envol && finestraOn && !$("finestra").hidden) dibuixaFinestra(t);
+    if (mapaLlest) {
+      mouCamera();
+      if (vol.estat === "en_vol") { posaAvio(); if (t - ultimFet > 300) { ultimFet = t; actualitzaFet(); } }
+      if (t - ultimNit > 60000) { ultimNit = t; actualitzaNit(); }
+    }
+    if (t - ultimTema > 30000) { ultimTema = t; aplicaTema(); }
+    if (vol.estat === "en_vol" && finestraOn && !$("finestra").hidden) dibuixaFinestra(t);
   }
   requestAnimationFrame(bucle);
 }
-if (window.ResizeObserver) { new ResizeObserver(mida).observe(cv); new ResizeObserver(midaFinestra).observe(cf); }
-window.addEventListener("resize", () => { mida(); midaFinestra(); });
+if (window.ResizeObserver) new ResizeObserver(midaFinestra).observe(cf);
+window.addEventListener("resize", () => { midaFinestra(); ultimObjectiu = ""; });
 
 mostraPestanya(["vol", "diari", "passaport"].indexOf(pestanya) >= 0 ? pestanya : "vol");
-mida(); renderTot();
+aplicaTema();
+iniciaMapa();
+renderTot();
 requestAnimationFrame(bucle);
-carregaMapa();
 iniciaStore();
 })();
 </script>
